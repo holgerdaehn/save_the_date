@@ -1,0 +1,26 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie erwartet
+labels: [bug]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: System
+      options: [macOS, Windows]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Zu finden unter „Über Save the Date“
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: Was ist passiert?
+      description: Schritte zum Nachstellen, erwartetes und tatsächliches Verhalten. Bitte keine privaten Fotos anhängen.
+    validations:
+      required: true

@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+.build/
+build/
+AppIcon.iconset/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+.swiftpm/
+
+# .NET / Windows
+bin/
+obj/
+publish/
+*.user
+*.suo
+.vs/
+
+# Editoren
+.idea/
+.vscode/

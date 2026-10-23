@@ -1,0 +1,19 @@
+<Window x:Class="SaveTheDate.HelpWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Save the Date – Anleitung" Width="960" Height="680" MinWidth="720" MinHeight="460" WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <ListBox x:Name="Topics" BorderThickness="0,0,1,0" BorderBrush="#22808080" DisplayMemberPath="Title"
+                 FontSize="14" Padding="6" SelectionChanged="OnTopic"/>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="32,26,32,32" MaxWidth="720" HorizontalAlignment="Left">
+                <TextBlock x:Name="TitleText" FontSize="28" FontWeight="Bold" Margin="0,0,0,16" TextWrapping="Wrap"/>
+                <TextBlock x:Name="BodyText" FontSize="14" LineHeight="22" TextWrapping="Wrap"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

@@ -1,0 +1,352 @@
+<Window x:Class="SaveTheDate.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:SaveTheDate"
+        Title="Save the Date" Width="1380" Height="860" MinWidth="1020" MinHeight="640"
+        AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver" PreviewKeyDown="OnKey">
+    <Window.Resources>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Background" Value="#14808080"/>
+            <Setter Property="BorderBrush" Value="#22808080"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        <Style x:Key="Secondary" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style x:Key="SegBar" TargetType="Border">
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="Background" Value="#22808080"/>
+        </Style>
+        <Style x:Key="Seg" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" CornerRadius="7" Margin="2" Padding="6,5" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#22808080"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0A84FF"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Primary" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="#0A84FF" CornerRadius="10" Padding="12,10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0071E3"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0060C0"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Cell" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,0"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style x:Key="NewCell" TargetType="TextBlock" BasedOn="{StaticResource Cell}">
+            <Setter Property="Foreground" Value="#0A84FF"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Menü -->
+        <Menu Grid.Row="0">
+            <MenuItem Header="_Datei">
+                <MenuItem Header="Dateien öffnen …" InputGestureText="Strg+O" Click="OpenFiles"/>
+                <MenuItem Header="Ordner öffnen …" InputGestureText="Strg+Umschalt+O" Click="OpenFolder"/>
+                <Separator/>
+                <MenuItem Header="Neu einlesen" InputGestureText="F5" Click="OnRescan"/>
+                <MenuItem Header="Liste leeren" Click="OnClear"/>
+                <Separator/>
+                <MenuItem Header="Beenden" InputGestureText="Alt+F4" Click="OnExit"/>
+            </MenuItem>
+            <MenuItem Header="_Bearbeiten">
+                <MenuItem Header="Alles auswählen" InputGestureText="Strg+A" Click="OnSelectAll"/>
+                <MenuItem Header="Aus Liste entfernen" InputGestureText="Entf" Click="OnRemove"/>
+            </MenuItem>
+            <MenuItem Header="_Aktion">
+                <MenuItem Header="Änderungen anwenden" InputGestureText="Strg+Enter" Click="OnApply"/>
+                <MenuItem x:Name="MnuUndo" Header="Datei-Daten der letzten Aktion zurücksetzen" IsEnabled="False" Click="OnUndo"/>
+            </MenuItem>
+            <MenuItem Header="_Werkzeuge">
+                <MenuItem Header="Duplikate suchen …" InputGestureText="Strg+Umschalt+D" Click="OnDupes"/>
+                <MenuItem Header="Nach Datum sortieren …" InputGestureText="Strg+Umschalt+S" Click="OnOrganize"/>
+                <MenuItem x:Name="MnuUndoSort" Header="Letzte Sortierung rückgängig" IsEnabled="False" Click="OnUndoSort"/>
+                <Separator/>
+                <MenuItem Header="Aufräumen …" InputGestureText="Strg+Umschalt+K" Click="OnCleanup"/>
+            </MenuItem>
+            <MenuItem Header="_Ansicht">
+                <MenuItem Header="Spalte „Ordner“" IsCheckable="True" Tag="1" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Erstellt“" IsCheckable="True" IsChecked="True" Tag="2" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Geändert“" IsCheckable="True" IsChecked="True" Tag="3" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Aufnahme“" IsCheckable="True" IsChecked="True" Tag="4" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Standort“" IsCheckable="True" IsChecked="True" Tag="5" Click="OnColumn"/>
+                <MenuItem Header="Vorschau-Spalten (→)" IsCheckable="True" IsChecked="True" Tag="6" Click="OnColumn"/>
+            </MenuItem>
+            <MenuItem Header="_Optionen">
+                <MenuItem x:Name="MnuRecursive" Header="Unterordner einbeziehen" IsCheckable="True" IsChecked="True" Click="OnScanOption"/>
+                <MenuItem x:Name="MnuDirs" Header="Ordner mitbearbeiten" IsCheckable="True" Click="OnScanOption"/>
+                <MenuItem x:Name="MnuHidden" Header="Versteckte Dateien" IsCheckable="True" Click="OnScanOption"/>
+                <Separator/>
+                <MenuItem x:Name="MnuConfirm" Header="Vor dem Anwenden nachfragen" IsCheckable="True" IsChecked="True"/>
+            </MenuItem>
+            <MenuItem Header="_Hilfe">
+                <MenuItem Header="Anleitung" InputGestureText="F1" Click="OnHelp"/>
+                <MenuItem Header="Tastenkürzel" Click="OnKeys"/>
+                <Separator/>
+                <MenuItem Header="Über Save the Date" Click="OnAbout"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Werkzeugleiste -->
+        <Border Grid.Row="1" Padding="10,6" BorderThickness="0,0,0,1" BorderBrush="#22808080">
+            <DockPanel>
+                <TextBox x:Name="Search" DockPanel.Dock="Right" Width="220" ToolTip="Nach Dateinamen filtern"
+                         VerticalContentAlignment="Center" TextChanged="OnSearch"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="＋  Dateien …" Padding="12,6" Margin="0,0,6,0" Click="OpenFiles"/>
+                    <Button Content="Ordner …" Padding="12,6" Margin="0,0,14,0" Click="OpenFolder"/>
+                    <ToggleButton Content="Unterordner" Padding="12,6" Margin="0,0,6,0" ToolTip="Unterordner einbeziehen"
+                                  IsChecked="{Binding IsChecked, ElementName=MnuRecursive, Mode=TwoWay}" Click="OnScanOption"/>
+                    <ToggleButton Content="Ordner mitbearbeiten" Padding="12,6" Margin="0,0,6,0" ToolTip="Ordner selbst ebenfalls ändern"
+                                  IsChecked="{Binding IsChecked, ElementName=MnuDirs, Mode=TwoWay}" Click="OnScanOption"/>
+                    <ToggleButton Content="Versteckte" Padding="12,6" Margin="0,0,14,0" ToolTip="Versteckte Dateien anzeigen"
+                                  IsChecked="{Binding IsChecked, ElementName=MnuHidden, Mode=TwoWay}" Click="OnScanOption"/>
+                    <Button Content="Duplikate" Padding="12,6" Margin="0,0,6,0" ToolTip="Doppelte Dateien finden (auch mit anderem Namen)" Click="OnDupes"/>
+                    <Button Content="Sortieren" Padding="12,6" Margin="0,0,6,0" ToolTip="Nach Datum in JJJJ/MM-Ordner ablegen" Click="OnOrganize"/>
+                    <Button Content="Aufräumen" Padding="12,6" Margin="0,0,14,0" ToolTip="desktop.ini, Thumbs.db &amp; leere Ordner entfernen" Click="OnCleanup"/>
+                    <Button Content="Neu einlesen" Padding="12,6" Margin="0,0,6,0" Click="OnRescan"/>
+                    <Button Content="Liste leeren" Padding="12,6" Click="OnClear"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Inhalt -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="400"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <DataGrid x:Name="Table" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                          SelectionMode="Extended" SelectionUnit="FullRow" GridLinesVisibility="None"
+                          HeadersVisibility="Column" RowHeight="32" ColumnHeaderHeight="34" BorderThickness="0"
+                          AlternatingRowBackground="#0C808080" Background="Transparent" RowBackground="Transparent"
+                          EnableRowVirtualization="True" SelectionChanged="OnSelectionChanged">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="Name" Width="240" SortMemberPath="Name">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="6,0">
+                                        <TextBlock Text="{Binding Icon}" FontFamily="Segoe MDL2 Assets" Width="22" Opacity="0.7" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Ordner" Binding="{Binding Folder}" SortMemberPath="Folder" Width="220"
+                                            Visibility="Collapsed" ElementStyle="{StaticResource Cell}"/>
+                        <DataGridTextColumn Header="Erstellt" Binding="{Binding CreatedText}" SortMemberPath="Created" Width="150"
+                                            ElementStyle="{StaticResource Cell}"/>
+                        <DataGridTextColumn Header="Geändert" Binding="{Binding ModifiedText}" SortMemberPath="Modified" Width="150"
+                                            ElementStyle="{StaticResource Cell}"/>
+                        <DataGridTextColumn Header="Aufnahme" Binding="{Binding TakenText}" SortMemberPath="Taken" Width="150"
+                                            ElementStyle="{StaticResource Cell}"/>
+                        <DataGridTextColumn Header="Standort" Binding="{Binding Location}" SortMemberPath="Lat" Width="150"
+                                            ElementStyle="{StaticResource Cell}"/>
+                        <DataGridTextColumn Header="→ Erstellt" Binding="{Binding NewCreated}" Width="150" ElementStyle="{StaticResource NewCell}"/>
+                        <DataGridTextColumn Header="→ Geändert" Binding="{Binding NewModified}" Width="150" ElementStyle="{StaticResource NewCell}"/>
+                        <DataGridTextColumn Header="→ Aufnahme" Binding="{Binding NewTaken}" Width="150" ElementStyle="{StaticResource NewCell}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <StackPanel x:Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="True">
+                    <TextBlock Text="&#xE787;" FontFamily="Segoe MDL2 Assets" FontSize="56" HorizontalAlignment="Center" Opacity="0.35"/>
+                    <TextBlock Text="Dateien oder Ordner hierher ziehen" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,10,0,4"/>
+                    <TextBlock Style="{StaticResource Secondary}" TextAlignment="Center" MaxWidth="380"
+                               Text="Fotos, Dokumente, Ordner – inklusive Unterordner. Danach rechts Datum und Standort einstellen."/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                        <Button Content="Dateien …" Padding="16,7" Margin="0,0,8,0" Click="OpenFiles"/>
+                        <Button Content="Ordner …" Padding="16,7" Click="OpenFolder"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <!-- Inspektor -->
+            <Border Grid.Column="1" BorderThickness="1,0,0,0" BorderBrush="#22808080">
+                <DockPanel>
+                    <Border DockPanel.Dock="Bottom" Padding="14" BorderThickness="0,1,0,0" BorderBrush="#22808080">
+                        <StackPanel>
+                            <TextBlock x:Name="InfoText" Style="{StaticResource Secondary}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                            <Button x:Name="BtnApply" Style="{StaticResource Primary}" Content="Keine Änderung" IsEnabled="False" Click="OnApply"/>
+                            <Button x:Name="BtnUndo" Content="Datei-Daten zurücksetzen" HorizontalAlignment="Center" Margin="0,8,0,0"
+                                    Padding="12,4" IsEnabled="False" Click="OnUndo"/>
+                        </StackPanel>
+                    </Border>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="14">
+                            <!-- Datum -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Datum"/>
+                                    <Border Style="{StaticResource SegBar}">
+                                        <UniformGrid Rows="1">
+                                            <RadioButton x:Name="RbFixed" GroupName="mode" Style="{StaticResource Seg}" Content="Festes Datum" IsChecked="True" Checked="OnModeChanged"/>
+                                            <RadioButton x:Name="RbShift" GroupName="mode" Style="{StaticResource Seg}" Content="Verschieben" Checked="OnModeChanged"/>
+                                            <RadioButton x:Name="RbExif" GroupName="mode" Style="{StaticResource Seg}" Content="Aus Aufnahme" Checked="OnModeChanged"/>
+                                        </UniformGrid>
+                                    </Border>
+
+                                    <StackPanel Margin="0,12,0,0">
+                                        <CheckBox x:Name="CkC" Content="Erstellt" IsChecked="True" Click="OnSettingChanged"/>
+                                        <StackPanel x:Name="PkC" Orientation="Horizontal" Margin="0,4,0,8">
+                                            <DatePicker x:Name="DpC" Width="150" SelectedDateChanged="OnDateEdited"/>
+                                            <TextBox x:Name="TmC" Width="84" Margin="6,0,0,0" VerticalContentAlignment="Center" ToolTip="Uhrzeit hh:mm:ss" TextChanged="OnDateEdited"/>
+                                            <Button Content="Jetzt" Margin="6,0,0,0" Padding="10,4" Tag="C" Click="OnNow"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <CheckBox x:Name="CkM" Content="Geändert" IsChecked="True" Click="OnSettingChanged"/>
+                                        <StackPanel x:Name="PkM" Orientation="Horizontal" Margin="0,4,0,8">
+                                            <DatePicker x:Name="DpM" Width="150" SelectedDateChanged="OnDateEdited"/>
+                                            <TextBox x:Name="TmM" Width="84" Margin="6,0,0,0" VerticalContentAlignment="Center" ToolTip="Uhrzeit hh:mm:ss" TextChanged="OnDateEdited"/>
+                                            <Button Content="Jetzt" Margin="6,0,0,0" Padding="10,4" Tag="M" Click="OnNow"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel x:Name="RowT">
+                                        <CheckBox x:Name="CkT" Content="Aufnahme (Foto-EXIF, nur JPEG)" Click="OnSettingChanged"/>
+                                        <StackPanel x:Name="PkT" Orientation="Horizontal" Margin="0,4,0,8">
+                                            <DatePicker x:Name="DpT" Width="150" SelectedDateChanged="OnDateEdited"/>
+                                            <TextBox x:Name="TmT" Width="84" Margin="6,0,0,0" VerticalContentAlignment="Center" ToolTip="Uhrzeit hh:mm:ss" TextChanged="OnDateEdited"/>
+                                            <Button Content="Jetzt" Margin="6,0,0,0" Padding="10,4" Tag="T" Click="OnNow"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel x:Name="PnFixed">
+                                        <CheckBox x:Name="CkLink" Content="Alle Werte verknüpfen" IsChecked="True" Click="OnLinkChanged"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0" ToolTip="0 = alle gleich; sonst Abstand in Sekunden zwischen den Dateien (nach Name sortiert)">
+                                            <TextBlock Text="Abstand pro Datei" VerticalAlignment="Center"/>
+                                            <TextBox x:Name="TxInterval" Text="0" Width="60" Margin="8,0,6,0" HorizontalContentAlignment="Right" TextChanged="OnSettingChanged"/>
+                                            <TextBlock Text="Sek." VerticalAlignment="Center" Style="{StaticResource Secondary}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel x:Name="PnShift" Visibility="Collapsed">
+                                        <Border Style="{StaticResource SegBar}" Margin="0,4,0,10">
+                                            <UniformGrid Rows="1">
+                                                <RadioButton x:Name="RbLater" GroupName="dir" Style="{StaticResource Seg}" Content="Später" IsChecked="True" Checked="OnSettingChanged"/>
+                                                <RadioButton x:Name="RbEarlier" GroupName="dir" Style="{StaticResource Seg}" Content="Früher" Checked="OnSettingChanged"/>
+                                            </UniformGrid>
+                                        </Border>
+                                        <UniformGrid Rows="1">
+                                            <StackPanel Margin="0,0,6,0"><TextBox x:Name="TxD" Text="0" HorizontalContentAlignment="Right" TextChanged="OnSettingChanged"/><TextBlock Text="Tage" Style="{StaticResource Secondary}" HorizontalAlignment="Center"/></StackPanel>
+                                            <StackPanel Margin="0,0,6,0"><TextBox x:Name="TxH" Text="0" HorizontalContentAlignment="Right" TextChanged="OnSettingChanged"/><TextBlock Text="Std." Style="{StaticResource Secondary}" HorizontalAlignment="Center"/></StackPanel>
+                                            <StackPanel Margin="0,0,6,0"><TextBox x:Name="TxMin" Text="0" HorizontalContentAlignment="Right" TextChanged="OnSettingChanged"/><TextBlock Text="Min." Style="{StaticResource Secondary}" HorizontalAlignment="Center"/></StackPanel>
+                                            <StackPanel><TextBox x:Name="TxS" Text="0" HorizontalContentAlignment="Right" TextChanged="OnSettingChanged"/><TextBlock Text="Sek." Style="{StaticResource Secondary}" HorizontalAlignment="Center"/></StackPanel>
+                                        </UniformGrid>
+                                    </StackPanel>
+
+                                    <TextBlock x:Name="PnExif" Visibility="Collapsed" Style="{StaticResource Secondary}" Margin="0,4,0,0"
+                                               Text="Erstellt- und Änderungsdatum werden auf das EXIF-Aufnahmedatum der Fotos gesetzt."/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Standort -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Standort"/>
+                                    <Border Style="{StaticResource SegBar}">
+                                        <UniformGrid Rows="1">
+                                            <RadioButton x:Name="RbGeoKeep" GroupName="geo" Style="{StaticResource Seg}" Content="Unverändert" IsChecked="True" Checked="OnGeoModeChanged"/>
+                                            <RadioButton x:Name="RbGeoSet" GroupName="geo" Style="{StaticResource Seg}" Content="Setzen" Checked="OnGeoModeChanged"/>
+                                            <RadioButton x:Name="RbGeoRemove" GroupName="geo" Style="{StaticResource Seg}" Content="Entfernen" Checked="OnGeoModeChanged"/>
+                                        </UniformGrid>
+                                    </Border>
+
+                                    <StackPanel x:Name="PnGeo" Visibility="Collapsed" Margin="0,10,0,0">
+                                        <TextBox x:Name="GeoQuery" KeyDown="OnGeoQueryKey" VerticalContentAlignment="Center"
+                                                 ToolTip="Ort oder Adresse eingeben und Enter drücken"/>
+                                        <TextBlock Text="Ort oder Adresse suchen (Enter)" Style="{StaticResource Secondary}" Margin="2,2,0,6"/>
+                                        <ListBox x:Name="GeoHits" MaxHeight="130" Visibility="Collapsed" DisplayMemberPath="Label"
+                                                 SelectionChanged="OnGeoHit" Margin="0,0,0,6"/>
+                                        <Grid Height="240">
+                                            <Border BorderThickness="1" BorderBrush="#33808080" CornerRadius="8" ClipToBounds="True">
+                                                <local:MapControl x:Name="MapView"/>
+                                            </Border>
+                                            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8">
+                                                <Button Content="＋" Width="30" Height="30" Click="OnZoomIn"/>
+                                                <Button Content="−" Width="30" Height="30" Margin="0,4,0,0" Click="OnZoomOut"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <TextBox x:Name="GeoText" Margin="0,8,0,0" VerticalContentAlignment="Center" KeyDown="OnGeoTextKey" LostFocus="OnGeoTextLost"
+                                                 ToolTip="Breite, Länge – z. B. 52.5200, 13.4050 (Enter)"/>
+                                        <TextBlock Style="{StaticResource Secondary}" Margin="2,2,0,6"
+                                                   Text="Auf die Karte klicken oder Koordinaten eingeben: Breite, Länge"/>
+                                        <Button x:Name="BtnFromSel" Content="Von Auswahl übernehmen" HorizontalAlignment="Left" Padding="12,5" Click="OnGeoFromSelection"/>
+                                    </StackPanel>
+                                    <TextBlock Style="{StaticResource Secondary}" Margin="0,10,0,0" Text="Nur für JPEG-Fotos."/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- Statusleiste -->
+        <Border Grid.Row="3" Padding="12,6" BorderThickness="0,1,0,0" BorderBrush="#22808080">
+            <DockPanel>
+                <ProgressBar x:Name="Prog" DockPanel.Dock="Right" Width="160" Height="6" Visibility="Collapsed"/>
+                <TextBlock x:Name="StatusText" Style="{StaticResource Secondary}" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

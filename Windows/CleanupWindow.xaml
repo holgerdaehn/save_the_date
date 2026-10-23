@@ -1,0 +1,59 @@
+<Window x:Class="SaveTheDate.CleanupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Aufräumen" Width="940" Height="680" MinWidth="720" MinHeight="480" WindowStartupLocation="CenterOwner">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="18,14,18,8">
+            <TextBlock Text="Aufräumen" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock Style="{StaticResource Secondary}"
+                       Text="Findet überflüssige Dateien wie desktop.ini, Thumbs.db, .DS_Store und ._*-Reste sowie leere Ordner. Alles landet im Papierkorb."/>
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Eigene Muster" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBox x:Name="TxPatterns" Grid.Column="1" VerticalContentAlignment="Center" KeyDown="OnPatternKey"
+                         ToolTip="z. B. *.tmp, *.bak, Zone.Identifier – * und ? als Platzhalter, mit Enter übernehmen"/>
+                <Button Grid.Column="2" Content="Neu suchen" Padding="12,5" Margin="8,0,0,0" Click="OnRescan"/>
+            </Grid>
+            <CheckBox x:Name="CkEmpty" Content="Leere Ordner entfernen" IsChecked="True" Margin="0,10,0,0" Click="OnRescan"/>
+        </StackPanel>
+        <Border DockPanel.Dock="Bottom" Padding="18,12" BorderThickness="0,1,0,0" BorderBrush="#22808080">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Schließen" Padding="16,7" Margin="0,0,8,0" IsCancel="True"/>
+                    <Button x:Name="BtnTrash" Content="In Papierkorb legen" Style="{StaticResource Danger}" Padding="18,8"
+                            IsEnabled="False" Click="OnTrash"/>
+                </StackPanel>
+                <Button Content="Alle" Padding="12,5" Margin="0,0,6,0" Click="OnAll"/>
+                <Button Content="Keine" Padding="12,5" Margin="0,0,12,0" Click="OnNone"/>
+                <TextBlock x:Name="Summary" Style="{StaticResource Secondary}" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+        <Grid>
+            <DataGrid x:Name="Table" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single"
+                      GridLinesVisibility="None" HeadersVisibility="Column" RowHeight="32" BorderThickness="0"
+                      AlternatingRowBackground="#0C808080" Background="Transparent" RowBackground="Transparent">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="Löschen" Width="80">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding Marked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True" Width="220" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="Ordner" Binding="{Binding Folder}" IsReadOnly="True" Width="*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="Grund" Binding="{Binding Reason}" IsReadOnly="True" Width="120" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="Größe" Binding="{Binding SizeText}" IsReadOnly="True" Width="90" ElementStyle="{StaticResource Cell}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+            <ProgressBar x:Name="Wait" IsIndeterminate="True" Width="260" Height="6" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <TextBlock x:Name="NoneFound" Visibility="Collapsed" Text="Nichts zu bereinigen" FontSize="18" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
+    </DockPanel>
+</Window>

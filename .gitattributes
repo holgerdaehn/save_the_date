@@ -1,0 +1,8 @@
+* text=auto
+*.sh text eol=lf
+*.swift text eol=lf
+*.cs text eol=lf
+*.xaml text eol=lf
+*.ico binary
+*.icns binary
+*.png binary

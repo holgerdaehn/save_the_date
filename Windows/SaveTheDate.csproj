@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SaveTheDate</AssemblyName>
+    <RootNamespace>SaveTheDate</RootNamespace>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Product>Save the Date</Product>
+    <AssemblyTitle>Save the Date</AssemblyTitle>
+    <Authors>Kundida (Holger Dähn)</Authors>
+    <Company>Kundida</Company>
+    <Copyright>© 2026 Kundida (Holger Dähn)</Copyright>
+    <Description>Datum, Aufnahmezeit und Standort von Fotos und Dateien ändern – mit Duplikatsuche, Sortierung nach Datum und Aufräumen.</Description>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- Fluent-Theme (ThemeMode) ist in WPF noch als "experimentell" markiert -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Tests/**" />
+    <Resource Include="app.ico" />
+  </ItemGroup>
+</Project>

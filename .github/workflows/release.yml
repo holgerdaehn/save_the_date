@@ -1,0 +1,58 @@
+name: Release
+
+# Wird durch ein Versions-Tag ausgelöst:  git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: App bauen
+        working-directory: macOS
+        run: ./build.sh
+      - name: Archiv erstellen
+        working-directory: macOS
+        run: ditto -c -k --keepParent "build/Save the Date.app" SaveTheDate-macOS.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: macOS/SaveTheDate-macOS.zip
+          retention-days: 1
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Veröffentlichen (eigenständig, eine .exe)
+        run: >
+          dotnet publish Windows/SaveTheDate.csproj -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+      - name: Archiv erstellen
+        run: Compress-Archive -Path publish/SaveTheDate.exe -DestinationPath SaveTheDate-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: SaveTheDate-Windows.zip
+          retention-days: 1
+
+  release:
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
