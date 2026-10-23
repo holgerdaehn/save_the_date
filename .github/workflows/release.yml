@@ -19,7 +19,7 @@ jobs:
       - name: Archiv erstellen
         working-directory: macOS
         run: ditto -c -k --keepParent "build/Save the Date.app" SaveTheDate-macOS.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos
           path: macOS/SaveTheDate-macOS.zip
@@ -38,7 +38,7 @@ jobs:
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
       - name: Archiv erstellen
         run: Compress-Archive -Path publish/SaveTheDate.exe -DestinationPath SaveTheDate-Windows.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: SaveTheDate-Windows.zip
