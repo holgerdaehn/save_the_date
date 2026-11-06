@@ -4,8 +4,22 @@ import Observation
 import SwiftUI
 
 enum Keep: String, CaseIterable, Identifiable {
-    case oldest = "Ältestes behalten", newest = "Neuestes behalten", shortest = "Kürzesten Pfad behalten", first = "Erstes behalten"
+    case oldest = "Ältestes behalten", newest = "Neuestes behalten", largest = "Größte Datei behalten",
+         shortest = "Kürzesten Pfad behalten", first = "Erstes behalten"
     var id: Self { self }
+}
+
+/// Wie Duplikate erkannt werden.
+enum DupeMode: String, CaseIterable, Identifiable {
+    case exact = "Identischer Inhalt", similar = "Ähnliche Bilder"
+    var id: Self { self }
+}
+
+/// Empfindlichkeit der Bildähnlichkeit (maximaler Hash-Abstand von 64 Bit).
+enum Sensitivity: Int, CaseIterable, Identifiable {
+    case strict = 3, normal = 6, loose = 10
+    var id: Self { self }
+    var label: String { self == .strict ? "Streng" : self == .normal ? "Normal" : "Locker" }
 }
 
 enum Dupes {
@@ -68,6 +82,7 @@ enum Dupes {
         switch rule {
         case .oldest: return g.min { (age($0), $0.id.path.count, $0.id.path) < (age($1), $1.id.path.count, $1.id.path) }!
         case .newest: return g.max { (age($0), $1.id.path.count, $1.id.path) < (age($1), $0.id.path.count, $0.id.path) }!
+        case .largest: return g.min { (-$0.size, $0.id.path.count, $0.id.path) < (-$1.size, $1.id.path.count, $1.id.path) }!
         case .shortest: return g.min { ($0.id.path.count, $0.id.path) < ($1.id.path.count, $1.id.path) }!
         case .first: return g[0]
         }
@@ -79,13 +94,20 @@ final class DupeModel {
     var groups: [[Item]] = []
     var marked = Set<URL>()
     var keep = Keep.oldest
+    var mode = DupeMode.exact
+    var sensitivity = Sensitivity.normal
     var progress = 0.0
     var scanning = true
     @ObservationIgnored private var task: Task<Void, Never>?
 
     func scan(_ items: [Item]) {
+        task?.cancel()
+        scanning = true; progress = 0; groups = []; marked = []
+        let (mode, dist) = (mode, sensitivity.rawValue)
         task = Task {
-            let g = await Dupes.find(items) { p in Task { @MainActor in self.progress = p } }
+            let report: @Sendable (Double) -> Void = { p in Task { @MainActor in self.progress = p } }
+            let g = mode == .exact ? await Dupes.find(items, progress: report)
+                                   : await Similar.groups(items, maxDistance: dist, progress: report)
             guard !Task.isCancelled else { return }
             groups = g
             autoMark()

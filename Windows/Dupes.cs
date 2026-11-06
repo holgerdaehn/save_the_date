@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 
 namespace SaveTheDate;
 
-public enum Keep { Oldest, Newest, Shortest, First }
+public enum Keep { Oldest, Newest, Largest, Shortest, First }
 
 public static class Dupes
 {
@@ -65,6 +65,7 @@ public static class Dupes
         {
             Keep.Oldest => g.OrderBy(Age).ThenBy(i => i.FullPath.Length).ThenBy(i => i.FullPath, cmp).First(),
             Keep.Newest => g.OrderByDescending(Age).ThenBy(i => i.FullPath.Length).ThenBy(i => i.FullPath, cmp).First(),
+            Keep.Largest => g.OrderByDescending(i => i.Size).ThenBy(i => i.FullPath.Length).ThenBy(i => i.FullPath, cmp).First(),
             Keep.Shortest => g.OrderBy(i => i.FullPath.Length).ThenBy(i => i.FullPath, cmp).First(),
             _ => g[0],
         };

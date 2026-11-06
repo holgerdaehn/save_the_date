@@ -23,7 +23,7 @@
                 <TextBlock Text="Save the Date" FontSize="26" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,14,0,0"/>
                 <TextBlock x:Name="TxVersion" Style="{StaticResource Secondary}" HorizontalAlignment="Center"/>
                 <TextBlock TextAlignment="Center" Margin="0,14,0,0" TextWrapping="Wrap"
-                           Text="Datum, Aufnahmezeit und Standort von Fotos und Dateien ändern – dazu Duplikate finden, Fotos nach Jahr und Monat sortieren und überflüssige Dateien aufräumen."/>
+                           Text="Datum, Aufnahmezeit und Standort von Fotos, Videos und Dateien ändern – dazu Duplikate und ähnliche Bilder finden, Dateien nach Datum sortieren und umbenennen, Fotos per GPX-Track geotaggen und überflüssige Dateien aufräumen."/>
 
                 <Grid Margin="0,20,0,0">
                     <Grid.ColumnDefinitions>

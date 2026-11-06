@@ -1,8 +1,8 @@
 import SwiftUI
 
-private func bytes(_ n: Int64) -> String { ByteCountFormatter.string(fromByteCount: n, countStyle: .file) }
+func bytes(_ n: Int64) -> String { ByteCountFormatter.string(fromByteCount: n, countStyle: .file) }
 
-private struct ToolHeader: View {
+struct ToolHeader: View {
     let title: String
     let text: String
     var body: some View {
@@ -25,9 +25,24 @@ struct DuplicatesView: View {
     @State private var result: String?
 
     var body: some View {
+        @Bindable var model = m
         VStack(spacing: 0) {
             ToolHeader(title: "Duplikate",
-                       text: "Gleicher Inhalt (SHA-256) – egal, wie die Dateien heißen. Gelöscht wird nur in den Papierkorb.")
+                       text: m.mode == .exact
+                           ? "Gleicher Inhalt (SHA-256) – egal, wie die Dateien heißen. Gelöscht wird nur in den Papierkorb."
+                           : "Ähnliche Fotos – auch skaliert, neu komprimiert oder leicht bearbeitet. Bitte vor dem Löschen prüfen; gelöscht wird nur in den Papierkorb.")
+            HStack {
+                Picker("", selection: $model.mode) { ForEach(DupeMode.allCases) { Text($0.rawValue).tag($0) } }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                if m.mode == .similar {
+                    Picker("Empfindlichkeit", selection: $model.sensitivity) { ForEach(Sensitivity.allCases) { Text($0.label).tag($0) } }
+                        .fixedSize()
+                }
+                Spacer()
+            }
+            .padding(.horizontal).padding(.bottom, 10)
+            .onChange(of: m.mode) { m.keep = m.mode == .similar ? .largest : .oldest; m.scan(store.items) }
+            .onChange(of: m.sensitivity) { m.scan(store.items) }
             Divider()
             if m.scanning {
                 VStack(spacing: 10) {
@@ -37,11 +52,11 @@ struct DuplicatesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if m.groups.isEmpty {
                 ContentUnavailableView("Keine Duplikate gefunden", systemImage: "checkmark.circle",
-                                       description: Text("Verglichen wurden \(store.items.filter { !$0.isDir }.count) Dateien."))
+                                       description: Text(m.mode == .exact ? "Verglichen wurden \(store.items.filter { !$0.isDir }.count) Dateien." : "Verglichen wurden \(store.items.filter(\.isImage).count) Bilder."))
             } else {
                 List {
                     ForEach(Array(m.groups.enumerated()), id: \.offset) { i, g in
-                        Section("Gruppe \(i + 1) · \(g.count) × \(bytes(g[0].size))") {
+                        Section(m.mode == .exact ? "Gruppe \(i + 1) · \(g.count) × \(bytes(g[0].size))" : "Gruppe \(i + 1) · \(g.count) ähnliche Bilder") {
                             ForEach(g) { row($0, g) }
                         }
                     }
@@ -70,11 +85,13 @@ struct DuplicatesView: View {
     private func row(_ it: Item, _ g: [Item]) -> some View {
         HStack {
             Toggle("", isOn: m.binding(it, in: g)).labelsHidden()
+            Thumb(url: it.id)
             VStack(alignment: .leading, spacing: 1) {
                 Text(it.name).lineLimit(1)
                 Text(it.folder).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
             Spacer()
+            if m.mode == .similar { Text(bytes(it.size)).monospacedDigit().foregroundStyle(.secondary) }
             Text(it.modified?.txt ?? "–").monospacedDigit().foregroundStyle(.secondary)
             Text(m.marked.contains(it.id) ? "Löschen" : "Behalten")
                 .font(.caption.bold()).frame(width: 60)
@@ -108,7 +125,7 @@ struct OrganizeView: View {
     struct Opts: Equatable {
         var root: URL?
         var pattern = Pattern.ym
-        var source = DateSource.taken
+        var source = DateSource.smart
         var onlyMedia = true
     }
     @State private var o = Opts()

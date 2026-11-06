@@ -31,11 +31,14 @@ struct SaveTheDateApp: App {
                 Divider()
                 Button("Neu einlesen") { store.rescan() }.keyboardShortcut("r").disabled(store.sources.isEmpty)
                 Button("Liste leeren") { store.clear() }.keyboardShortcut(.delete, modifiers: [.command, .shift]).disabled(store.sources.isEmpty)
+                Divider()
+                Button("Liste als CSV exportieren …") { store.exportCSV() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift]).disabled(store.items.isEmpty)
             }
             CommandMenu("Aktion") {
                 Button("Änderungen anwenden …") { store.requestApply() }
                     .keyboardShortcut(.return).disabled(store.items.isEmpty)
-                Button("Datei-Daten der letzten Aktion zurücksetzen") { store.undo() }
+                Button("Letzte Änderung rückgängig") { store.undo() }
                     .keyboardShortcut("z", modifiers: [.command, .option]).disabled(!store.canUndo)
             }
             CommandMenu("Werkzeuge") {
@@ -44,6 +47,12 @@ struct SaveTheDateApp: App {
                 Button("Nach Datum sortieren …") { store.showOrganize = true }
                     .keyboardShortcut("s", modifiers: [.command, .shift]).disabled(store.items.isEmpty)
                 Button("Letzte Sortierung rückgängig") { store.undoOrganize() }.disabled(store.lastOps.isEmpty)
+                Button("Nach Datum umbenennen …") { store.showRename = true }
+                    .keyboardShortcut("r", modifiers: [.command, .shift]).disabled(store.items.isEmpty)
+                Button("Letzte Umbenennung rückgängig") { store.undoRename() }.disabled(store.lastRenames.isEmpty)
+                Divider()
+                Button("Geotagging per GPX-Track …") { store.showGeotag = true }
+                    .keyboardShortcut("g", modifiers: [.command, .shift]).disabled(store.items.isEmpty)
                 Divider()
                 Button("Aufräumen …") { store.showCleanup = true }
                     .keyboardShortcut("k", modifiers: [.command, .shift]).disabled(store.sources.isEmpty)
@@ -51,6 +60,9 @@ struct SaveTheDateApp: App {
             CommandGroup(after: .toolbar) {
                 Toggle("Informationen", isOn: Binding(get: { store.showInspector }, set: { store.showInspector = $0 }))
                     .keyboardShortcut("i", modifiers: [.command, .option])
+                Picker("Anzeigen", selection: Binding(get: { store.filter }, set: { store.filter = $0 })) {
+                    ForEach(ItemFilter.allCases) { Text($0.rawValue).tag($0) }
+                }
                 Divider()
                 Toggle("Unterordner einbeziehen", isOn: $recursive)
                 Toggle("Ordner mitbearbeiten", isOn: $dirs)

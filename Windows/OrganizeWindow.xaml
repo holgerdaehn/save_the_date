@@ -40,10 +40,14 @@
                     <ComboBoxItem Content="JJJJ/MM"/>
                     <ComboBoxItem Content="JJJJ/MM/TT"/>
                     <ComboBoxItem Content="JJJJ-MM"/>
+                    <ComboBoxItem Content="JJJJ"/>
+                    <ComboBoxItem Content="JJJJ-MM-TT"/>
+                    <ComboBoxItem Content="JJJJ/JJJJ-MM-TT"/>
                 </ComboBox>
 
                 <TextBlock Grid.Row="2" Text="Datum" VerticalAlignment="Center" Margin="0,0,16,8"/>
                 <ComboBox x:Name="CmbSource" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" SelectedIndex="0" Margin="0,0,0,8" SelectionChanged="OnOpt">
+                    <ComboBoxItem Content="Aufnahme, Dateiname oder Änderung"/>
                     <ComboBoxItem Content="Aufnahme, sonst Änderung"/>
                     <ComboBoxItem Content="Änderungsdatum"/>
                     <ComboBoxItem Content="Erstelldatum"/>

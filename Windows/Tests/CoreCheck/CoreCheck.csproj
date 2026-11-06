@@ -6,6 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../ExifJpeg.cs;../../Models.cs;../../Dupes.cs;../../Organizer.cs;../../Cleanup.cs" />
+    <Compile Include="../../ExifJpeg.cs;../../Models.cs;../../Dupes.cs;../../Organizer.cs;../../Cleanup.cs;../../NameDate.cs;../../Mp4.cs;../../Gpx.cs;../../Csv.cs;../../Renamer.cs;../../Similar.cs" />
   </ItemGroup>
 </Project>

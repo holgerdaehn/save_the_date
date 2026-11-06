@@ -88,7 +88,7 @@ struct InspectorView: View {
                     case .fixed:
                         DateRow(title: "Erstellt", on: $st.s.setCreated, date: store.date(\.created))
                         DateRow(title: "Geändert", on: $st.s.setModified, date: store.date(\.modified))
-                        DateRow(title: "Aufnahme (Foto-EXIF)", on: $st.s.setTaken, date: store.date(\.taken))
+                        DateRow(title: "Aufnahme (Foto-EXIF, Video)", on: $st.s.setTaken, date: store.date(\.taken))
                         Toggle("Alle Werte verknüpfen", isOn: $st.s.linked)
                         HStack {
                             Text("Abstand pro Datei")
@@ -110,12 +110,16 @@ struct InspectorView: View {
                         }
                         Toggle("Erstellt", isOn: $st.s.setCreated)
                         Toggle("Geändert", isOn: $st.s.setModified)
-                        Toggle("Aufnahme (Foto-EXIF)", isOn: $st.s.setTaken)
-                    case .exif:
-                        Text("Erstellt- und Änderungsdatum werden auf das EXIF-Aufnahmedatum der Fotos gesetzt.")
+                        Toggle("Aufnahme (Foto-EXIF, Video)", isOn: $st.s.setTaken)
+                    case .copy:
+                        Picker("Quelle", selection: $st.s.origin) { ForEach(Origin.allCases) { Text($0.rawValue).tag($0) } }
+                        Text(st.s.origin == .name
+                             ? "Liest das Datum aus Namen wie IMG-20190713-WA0001, PXL_20210101_120533 oder Bildschirmfoto 2020-02-18 um 14.22.05 (ohne Uhrzeit: 12:00)."
+                             : "Setzt die gewählten Werte auf das Datum der Quelle. Dateien ohne dieses Datum bleiben unverändert.")
                             .font(.callout).foregroundStyle(.secondary)
                         Toggle("Erstellt", isOn: $st.s.setCreated)
                         Toggle("Geändert", isOn: $st.s.setModified)
+                        Toggle("Aufnahme (Foto-EXIF, Video)", isOn: $st.s.setTaken)
                     }
                 }
                 Card(title: "Standort", icon: "mappin.and.ellipse") {
@@ -133,13 +137,13 @@ struct InspectorView: View {
         .ignoresSafeArea(.container, edges: .top)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 8) {
-                Text(store.selection.isEmpty ? "Wirkt auf alle \(store.items.count) Objekte" : "Wirkt auf \(store.selection.count) ausgewählte Objekte")
+                Text(store.selection.isEmpty ? (store.isFiltered ? "Wirkt auf die \(store.visible.count) angezeigten Objekte" : "Wirkt auf alle \(store.items.count) Objekte") : "Wirkt auf \(store.selection.count) ausgewählte Objekte")
                     .font(.callout).foregroundStyle(.secondary)
                 Button { store.requestApply() } label: {
                     Text(n == 0 ? "Keine Änderung" : "\(n) Objekte ändern").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent).controlSize(.large).disabled(n == 0 || store.progress != nil)
-                Button("Datei-Daten zurücksetzen") { store.undo() }.controlSize(.small).disabled(!store.canUndo)
+                Button("Letzte Änderung rückgängig") { store.undo() }.controlSize(.small).disabled(!store.canUndo)
             }
             .padding(14)
             .background(.bar)

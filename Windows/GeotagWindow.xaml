@@ -1,0 +1,62 @@
+<Window x:Class="SaveTheDate.GeotagWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Geotagging per GPX-Track" Width="940" Height="720" MinWidth="720" MinHeight="560" WindowStartupLocation="CenterOwner">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="18,14,18,8">
+            <TextBlock Text="Geotagging per GPX-Track" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock Style="{StaticResource Secondary}"
+                       Text="Ordnet Fotos anhand der Aufnahmezeit einen Ort aus dem Tracklog eines GPS-Loggers oder einer Wander-/Lauf-App zu (GPX). Nur JPEG-Fotos."/>
+        </StackPanel>
+        <Border DockPanel.Dock="Bottom" Padding="18,12" BorderThickness="0,1,0,0" BorderBrush="#22808080">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Abbrechen" Padding="16,7" Margin="0,0,8,0" IsCancel="True"/>
+                    <Button x:Name="BtnGo" Content="Standort schreiben" Style="{StaticResource Primary}" Padding="22,8" IsEnabled="False" Click="OnGo"/>
+                </StackPanel>
+                <TextBlock x:Name="Summary" Style="{StaticResource Secondary}" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+        <Grid Margin="18,0,18,8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="GPX-Dateien" VerticalAlignment="Center" Margin="0,0,16,8"/>
+                <TextBox x:Name="TxFiles" Grid.Column="1" IsReadOnly="True" Margin="0,0,8,8" VerticalContentAlignment="Center"/>
+                <Button Grid.Column="2" Content="Wählen …" Padding="12,5" Margin="0,0,0,8" Click="OnChoose"/>
+
+                <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,0,0,8">
+                    <CheckBox x:Name="CkZone" Content="Kamerauhr in anderer Zeitzone als dieser PC – UTC±" VerticalAlignment="Center" Click="OnOpt"
+                              ToolTip="z. B. 2 für Berlin im Sommer"/>
+                    <TextBox x:Name="TxZone" Text="0" Width="50" Margin="8,0,6,0" HorizontalContentAlignment="Right" IsEnabled="False" TextChanged="OnOpt"/>
+                    <TextBlock Text="Std." Style="{StaticResource Secondary}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Höchstens" VerticalAlignment="Center"/>
+                    <TextBox x:Name="TxGap" Text="15" Width="50" Margin="8,0,6,0" HorizontalContentAlignment="Right" TextChanged="OnOpt"/>
+                    <TextBlock Text="Minuten vom nächsten Trackpunkt" Style="{StaticResource Secondary}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <CheckBox x:Name="CkOverwrite" Grid.Row="3" Grid.ColumnSpan="3" Content="Vorhandene Standorte überschreiben" Click="OnOpt"/>
+            </Grid>
+            <DataGrid x:Name="Table" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                      GridLinesVisibility="None" HeadersVisibility="Column" RowHeight="30" BorderThickness="0"
+                      AlternatingRowBackground="#0C808080" Background="Transparent" RowBackground="Transparent">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Datei" Binding="{Binding Item.Name}" Width="*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="Aufnahme" Binding="{Binding Item.TakenText}" Width="160" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="Standort" Binding="{Binding Where}" Width="230" ElementStyle="{StaticResource Cell}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </DockPanel>
+</Window>

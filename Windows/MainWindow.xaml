@@ -104,6 +104,8 @@
                 <MenuItem Header="Neu einlesen" InputGestureText="F5" Click="OnRescan"/>
                 <MenuItem Header="Liste leeren" Click="OnClear"/>
                 <Separator/>
+                <MenuItem x:Name="MnuExport" Header="Liste als CSV exportieren …" InputGestureText="Strg+Umschalt+E" Click="OnExport"/>
+                <Separator/>
                 <MenuItem Header="Beenden" InputGestureText="Alt+F4" Click="OnExit"/>
             </MenuItem>
             <MenuItem Header="_Bearbeiten">
@@ -112,22 +114,27 @@
             </MenuItem>
             <MenuItem Header="_Aktion">
                 <MenuItem Header="Änderungen anwenden" InputGestureText="Strg+Enter" Click="OnApply"/>
-                <MenuItem x:Name="MnuUndo" Header="Datei-Daten der letzten Aktion zurücksetzen" IsEnabled="False" Click="OnUndo"/>
+                <MenuItem x:Name="MnuUndo" Header="Letzte Änderung rückgängig" IsEnabled="False" Click="OnUndo"/>
             </MenuItem>
             <MenuItem Header="_Werkzeuge">
                 <MenuItem Header="Duplikate suchen …" InputGestureText="Strg+Umschalt+D" Click="OnDupes"/>
                 <MenuItem Header="Nach Datum sortieren …" InputGestureText="Strg+Umschalt+S" Click="OnOrganize"/>
                 <MenuItem x:Name="MnuUndoSort" Header="Letzte Sortierung rückgängig" IsEnabled="False" Click="OnUndoSort"/>
+                <MenuItem Header="Nach Datum umbenennen …" InputGestureText="Strg+Umschalt+R" Click="OnRename"/>
+                <MenuItem x:Name="MnuUndoRename" Header="Letzte Umbenennung rückgängig" IsEnabled="False" Click="OnUndoRename"/>
+                <Separator/>
+                <MenuItem Header="Geotagging per GPX-Track …" InputGestureText="Strg+Umschalt+G" Click="OnGeotag"/>
                 <Separator/>
                 <MenuItem Header="Aufräumen …" InputGestureText="Strg+Umschalt+K" Click="OnCleanup"/>
             </MenuItem>
             <MenuItem Header="_Ansicht">
-                <MenuItem Header="Spalte „Ordner“" IsCheckable="True" Tag="1" Click="OnColumn"/>
-                <MenuItem Header="Spalte „Erstellt“" IsCheckable="True" IsChecked="True" Tag="2" Click="OnColumn"/>
-                <MenuItem Header="Spalte „Geändert“" IsCheckable="True" IsChecked="True" Tag="3" Click="OnColumn"/>
-                <MenuItem Header="Spalte „Aufnahme“" IsCheckable="True" IsChecked="True" Tag="4" Click="OnColumn"/>
-                <MenuItem Header="Spalte „Standort“" IsCheckable="True" IsChecked="True" Tag="5" Click="OnColumn"/>
-                <MenuItem Header="Vorschau-Spalten (→)" IsCheckable="True" IsChecked="True" Tag="6" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Größe“" IsCheckable="True" IsChecked="True" Tag="1" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Ordner“" IsCheckable="True" Tag="2" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Erstellt“" IsCheckable="True" IsChecked="True" Tag="3" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Geändert“" IsCheckable="True" IsChecked="True" Tag="4" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Aufnahme“" IsCheckable="True" IsChecked="True" Tag="5" Click="OnColumn"/>
+                <MenuItem Header="Spalte „Standort“" IsCheckable="True" IsChecked="True" Tag="6" Click="OnColumn"/>
+                <MenuItem Header="Vorschau-Spalten (→)" IsCheckable="True" IsChecked="True" Tag="7" Click="OnColumn"/>
             </MenuItem>
             <MenuItem Header="_Optionen">
                 <MenuItem x:Name="MnuRecursive" Header="Unterordner einbeziehen" IsCheckable="True" IsChecked="True" Click="OnScanOption"/>
@@ -147,9 +154,19 @@
         <!-- Werkzeugleiste -->
         <Border Grid.Row="1" Padding="10,6" BorderThickness="0,0,0,1" BorderBrush="#22808080">
             <DockPanel>
-                <TextBox x:Name="Search" DockPanel.Dock="Right" Width="220" ToolTip="Nach Dateinamen filtern"
+                <TextBox x:Name="Search" DockPanel.Dock="Right" Width="200" ToolTip="Nach Dateinamen filtern"
                          VerticalContentAlignment="Center" TextChanged="OnSearch"/>
-                <StackPanel Orientation="Horizontal">
+                <ComboBox x:Name="CmbFilter" DockPanel.Dock="Right" Width="170" Margin="8,0,8,0" SelectedIndex="0" SelectionChanged="OnSearch"
+                          ToolTip="Nur bestimmte Dateien anzeigen – Änderungen wirken dann nur auf die angezeigten Zeilen">
+                    <ComboBoxItem Content="Alle anzeigen"/>
+                    <ComboBoxItem Content="Nur Fotos"/>
+                    <ComboBoxItem Content="Nur Videos"/>
+                    <ComboBoxItem Content="Ohne Aufnahmedatum"/>
+                    <ComboBoxItem Content="Ohne Standort"/>
+                    <ComboBoxItem Content="Mit Standort"/>
+                    <ComboBoxItem Content="Datum weicht ab"/>
+                </ComboBox>
+                <WrapPanel Orientation="Horizontal">
                     <Button Content="＋  Dateien …" Padding="12,6" Margin="0,0,6,0" Click="OpenFiles"/>
                     <Button Content="Ordner …" Padding="12,6" Margin="0,0,14,0" Click="OpenFolder"/>
                     <ToggleButton Content="Unterordner" Padding="12,6" Margin="0,0,6,0" ToolTip="Unterordner einbeziehen"
@@ -160,10 +177,12 @@
                                   IsChecked="{Binding IsChecked, ElementName=MnuHidden, Mode=TwoWay}" Click="OnScanOption"/>
                     <Button Content="Duplikate" Padding="12,6" Margin="0,0,6,0" ToolTip="Doppelte Dateien finden (auch mit anderem Namen)" Click="OnDupes"/>
                     <Button Content="Sortieren" Padding="12,6" Margin="0,0,6,0" ToolTip="Nach Datum in JJJJ/MM-Ordner ablegen" Click="OnOrganize"/>
-                    <Button Content="Aufräumen" Padding="12,6" Margin="0,0,14,0" ToolTip="desktop.ini, Thumbs.db &amp; leere Ordner entfernen" Click="OnCleanup"/>
+                    <Button Content="Aufräumen" Padding="12,6" Margin="0,0,6,0" ToolTip="desktop.ini, Thumbs.db &amp; leere Ordner entfernen" Click="OnCleanup"/>
+                    <Button Content="Umbenennen" Padding="12,6" Margin="0,0,6,0" ToolTip="Dateien nach Datum umbenennen, z. B. 2024-07-13_14-22-05" Click="OnRename"/>
+                    <Button Content="Geotagging" Padding="12,6" Margin="0,0,14,0" ToolTip="Standort aus einem GPX-Track (GPS-Logger, Wander-App) zuordnen" Click="OnGeotag"/>
                     <Button Content="Neu einlesen" Padding="12,6" Margin="0,0,6,0" Click="OnRescan"/>
                     <Button Content="Liste leeren" Padding="12,6" Click="OnClear"/>
-                </StackPanel>
+                </WrapPanel>
             </DockPanel>
         </Border>
 
@@ -191,6 +210,8 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Größe" Binding="{Binding SizeText}" SortMemberPath="SizeKey" Width="80"
+                                            ElementStyle="{StaticResource Cell}"/>
                         <DataGridTextColumn Header="Ordner" Binding="{Binding Folder}" SortMemberPath="Folder" Width="220"
                                             Visibility="Collapsed" ElementStyle="{StaticResource Cell}"/>
                         <DataGridTextColumn Header="Erstellt" Binding="{Binding CreatedText}" SortMemberPath="Created" Width="150"
@@ -226,7 +247,7 @@
                         <StackPanel>
                             <TextBlock x:Name="InfoText" Style="{StaticResource Secondary}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                             <Button x:Name="BtnApply" Style="{StaticResource Primary}" Content="Keine Änderung" IsEnabled="False" Click="OnApply"/>
-                            <Button x:Name="BtnUndo" Content="Datei-Daten zurücksetzen" HorizontalAlignment="Center" Margin="0,8,0,0"
+                            <Button x:Name="BtnUndo" Content="Letzte Änderung rückgängig" HorizontalAlignment="Center" Margin="0,8,0,0"
                                     Padding="12,4" IsEnabled="False" Click="OnUndo"/>
                         </StackPanel>
                     </Border>
@@ -241,7 +262,7 @@
                                         <UniformGrid Rows="1">
                                             <RadioButton x:Name="RbFixed" GroupName="mode" Style="{StaticResource Seg}" Content="Festes Datum" IsChecked="True" Checked="OnModeChanged"/>
                                             <RadioButton x:Name="RbShift" GroupName="mode" Style="{StaticResource Seg}" Content="Verschieben" Checked="OnModeChanged"/>
-                                            <RadioButton x:Name="RbExif" GroupName="mode" Style="{StaticResource Seg}" Content="Aus Aufnahme" Checked="OnModeChanged"/>
+                                            <RadioButton x:Name="RbCopy" GroupName="mode" Style="{StaticResource Seg}" Content="Übernehmen" Checked="OnModeChanged"/>
                                         </UniformGrid>
                                     </Border>
 
@@ -262,7 +283,7 @@
                                         </StackPanel>
                                     </StackPanel>
                                     <StackPanel x:Name="RowT">
-                                        <CheckBox x:Name="CkT" Content="Aufnahme (Foto-EXIF, nur JPEG)" Click="OnSettingChanged"/>
+                                        <CheckBox x:Name="CkT" Content="Aufnahme (JPEG-Foto, MP4/MOV-Video)" Click="OnSettingChanged"/>
                                         <StackPanel x:Name="PkT" Orientation="Horizontal" Margin="0,4,0,8">
                                             <DatePicker x:Name="DpT" Width="150" SelectedDateChanged="OnDateEdited"/>
                                             <TextBox x:Name="TmT" Width="84" Margin="6,0,0,0" VerticalContentAlignment="Center" ToolTip="Uhrzeit hh:mm:ss" TextChanged="OnDateEdited"/>
@@ -294,8 +315,17 @@
                                         </UniformGrid>
                                     </StackPanel>
 
-                                    <TextBlock x:Name="PnExif" Visibility="Collapsed" Style="{StaticResource Secondary}" Margin="0,4,0,0"
-                                               Text="Erstellt- und Änderungsdatum werden auf das EXIF-Aufnahmedatum der Fotos gesetzt."/>
+                                    <StackPanel x:Name="PnCopy" Visibility="Collapsed" Margin="0,4,0,0">
+                                        <TextBlock Text="Quelle" Style="{StaticResource Secondary}"/>
+                                        <ComboBox x:Name="CmbOrigin" SelectedIndex="0" Margin="0,2,0,6" SelectionChanged="OnSettingChanged">
+                                            <ComboBoxItem Content="Aufnahmedatum"/>
+                                            <ComboBoxItem Content="Dateiname"/>
+                                            <ComboBoxItem Content="Erstelldatum"/>
+                                            <ComboBoxItem Content="Änderungsdatum"/>
+                                            <ComboBoxItem Content="Ältestes Datum"/>
+                                        </ComboBox>
+                                        <TextBlock x:Name="CopyHint" Style="{StaticResource Secondary}"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
 

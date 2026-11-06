@@ -49,10 +49,10 @@ public sealed class DupRow : INotifyPropertyChanged
 public partial class DuplicatesWindow : Window
 {
     readonly List<Item> files;
-    readonly CancellationTokenSource cts = new();
+    CancellationTokenSource cts = new();
     List<List<Item>> groups = new();
     List<DupRow> rows = new();
-    bool busy;
+    bool busy, ready, similarMode;
 
     /// <summary>true, wenn Dateien gelöscht wurden (Liste im Hauptfenster neu einlesen).</summary>
     public bool Changed { get; private set; }
@@ -61,19 +61,52 @@ public partial class DuplicatesWindow : Window
     {
         InitializeComponent();
         files = items.ToList();
+        ready = true;
         Loaded += async (_, _) => await ScanAsync();
         Closed += (_, _) => cts.Cancel();
     }
 
     async Task ScanAsync()
     {
+        cts.Cancel();
+        cts = new CancellationTokenSource();
+        var ct = cts.Token;
+        var similar = similarMode = CmbMode.SelectedIndex == 1;
+        var dist = CmbSens.SelectedIndex switch { 0 => (int)Sensitivity.Strict, 2 => (int)Sensitivity.Loose, _ => (int)Sensitivity.Normal };
+        Wait.Visibility = Visibility.Visible;
+        Table.Visibility = NoneFound.Visibility = Visibility.Collapsed;
+        Prog.Value = 0;
+        BtnTrash.IsEnabled = false;
+        Summary.Text = "";
+        void Report(double p) => Dispatcher.BeginInvoke(() => Prog.Value = p * 100);
+        List<List<Item>> found;
         try
         {
-            groups = await Task.Run(() => Dupes.Find(files, p => Dispatcher.BeginInvoke(() => Prog.Value = p * 100), cts.Token));
+            found = await Task.Run(() => similar ? Similar.Groups(files, ImageHash.Compute, dist, Report, ct) : Dupes.Find(files, Report, ct), ct);
         }
         catch (OperationCanceledException) { return; }
+        if (ct.IsCancellationRequested) return;
+        groups = found;
         Wait.Visibility = Visibility.Collapsed;
         Build();
+    }
+
+    void OnModeChanged(object s, RoutedEventArgs e)
+    {
+        if (!ready) return;
+        var sim = CmbMode.SelectedIndex == 1;
+        CmbSens.Visibility = sim ? Visibility.Visible : Visibility.Collapsed;
+        Intro.Text = sim
+            ? "Ähnliche Fotos – auch skaliert, neu komprimiert oder leicht bearbeitet. Bitte vor dem Löschen prüfen; gelöscht wird nur in den Papierkorb."
+            : "Gleicher Inhalt (SHA-256) – egal, wie die Dateien heißen. Gelöscht wird nur in den Papierkorb.";
+        rows = new();
+        CmbKeep.SelectedIndex = sim ? 2 : 0;
+        _ = ScanAsync();
+    }
+
+    void OnSensChanged(object s, RoutedEventArgs e)
+    {
+        if (ready) _ = ScanAsync();
     }
 
     void Build()
@@ -87,7 +120,7 @@ public partial class DuplicatesWindow : Window
                 var r = new DupRow
                 {
                     Item = it, GroupNo = i,
-                    GroupText = $"Gruppe {i + 1} · {groups[i].Count} × {FormatSize(it.Size)}",
+                    GroupText = similarMode ? $"Gruppe {i + 1} · {groups[i].Count} ähnliche Bilder" : $"Gruppe {i + 1} · {groups[i].Count} × {FormatSize(it.Size)}",
                     Peers = peers, Changed = UpdateSummary,
                 };
                 peers.Add(r);
@@ -152,11 +185,5 @@ public partial class DuplicatesWindow : Window
             + (errors.Count > 0 ? "\n\nFehler:\n" + string.Join("\n", errors.Take(10)) : ""), "Fertig");
     }
 
-    internal static string FormatSize(long n) => n switch
-    {
-        >= 1L << 30 => $"{n / (double)(1L << 30):0.0} GB",
-        >= 1L << 20 => $"{n / (double)(1L << 20):0.0} MB",
-        >= 1L << 10 => $"{n / (double)(1L << 10):0} KB",
-        _ => $"{n} Byte",
-    };
+    internal static string FormatSize(long n) => Fmt.Size(n);
 }

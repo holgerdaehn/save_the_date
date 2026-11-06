@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -20,12 +21,12 @@ public partial class MainWindow : Window
     Dictionary<Item, Plan> plans = new();
     List<Item> work = new();
     Settings settings = new();
-    Dictionary<string, (DateTime C, DateTime M)> undo = new();
+    Dictionary<string, UndoRec> undo = new();
     CancellationTokenSource? scanCts;
     (DatePicker Dp, TextBox Tm)[] pairs = [];
     bool ready, busy, restoring;
     double? lat, lon;
-    List<Op> lastOps = new();
+    List<Op> lastOps = new(), lastRenames = new();
     string? lastRoot;
 
     public MainWindow()
@@ -117,12 +118,21 @@ public partial class MainWindow : Window
         Recompute();
     }
 
-    void OnSearch(object s, RoutedEventArgs e) => ApplyFilter();
+    void OnSearch(object s, RoutedEventArgs e)
+    {
+        if (!ready) return;
+        ApplyFilter();
+        Recompute();
+    }
+
+    bool IsFiltered => Search.Text.Trim().Length > 0 || CmbFilter.SelectedIndex > 0;
 
     void ApplyFilter()
     {
         var q = Search.Text.Trim();
-        view.Filter = q.Length == 0 ? null : o => ((Item)o).Name.Contains(q, StringComparison.CurrentCultureIgnoreCase);
+        var f = (ItemFilter)Math.Max(CmbFilter.SelectedIndex, 0);
+        view.Filter = q.Length == 0 && f == ItemFilter.All ? null
+            : o => { var i = (Item)o; return (q.Length == 0 || i.Name.Contains(q, StringComparison.CurrentCultureIgnoreCase)) && f.Matches(i); };
     }
 
     void OnSelectAll(object s, RoutedEventArgs e) => Table.SelectAll();
@@ -138,7 +148,7 @@ public partial class MainWindow : Window
         var mi = (MenuItem)s;
         var first = int.Parse((string)mi.Tag);
         var vis = mi.IsChecked ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var i in first == 6 ? new[] { 6, 7, 8 } : new[] { first }) Table.Columns[i].Visibility = vis;
+        foreach (var i in first == 7 ? new[] { 7, 8, 9 } : new[] { first }) Table.Columns[i].Visibility = vis;
     }
 
     void OnSelectionChanged(object s, RoutedEventArgs e) { if (!restoring) Recompute(); }
@@ -173,9 +183,17 @@ public partial class MainWindow : Window
             if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) OpenFolder(null, null); else OpenFiles(null, null);
             e.Handled = true;
         }
-        else if (ctrl && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && e.Key is Key.D or Key.S or Key.K)
+        else if (ctrl && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && e.Key is Key.D or Key.S or Key.K or Key.R or Key.G or Key.E)
         {
-            if (e.Key == Key.D) OnDupes(null, null); else if (e.Key == Key.S) OnOrganize(null, null); else OnCleanup(null, null);
+            switch (e.Key)
+            {
+                case Key.D: OnDupes(null, null); break;
+                case Key.S: OnOrganize(null, null); break;
+                case Key.R: OnRename(null, null); break;
+                case Key.G: OnGeotag(null, null); break;
+                case Key.E: OnExport(null, null); break;
+                default: OnCleanup(null, null); break;
+            }
             e.Handled = true;
         }
         else if (e.Key == Key.F1) { ShowHelp(null); e.Handled = true; }
@@ -200,12 +218,10 @@ public partial class MainWindow : Window
     void UpdateModeUi()
     {
         var fixedMode = RbFixed.IsChecked == true;
-        var exif = RbExif.IsChecked == true;
         foreach (var p in new UIElement[] { PkC, PkM, PkT, PnFixed })
             p.Visibility = fixedMode ? Visibility.Visible : Visibility.Collapsed;
         PnShift.Visibility = RbShift.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        PnExif.Visibility = exif ? Visibility.Visible : Visibility.Collapsed;
-        RowT.Visibility = exif ? Visibility.Collapsed : Visibility.Visible;
+        PnCopy.Visibility = RbCopy.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void OnSettingChanged(object s, RoutedEventArgs e) => Recompute();
@@ -279,7 +295,8 @@ public partial class MainWindow : Window
     {
         var s = new Settings
         {
-            Mode = RbShift.IsChecked == true ? Mode.Shift : RbExif.IsChecked == true ? Mode.Exif : Mode.Fixed,
+            Mode = RbShift.IsChecked == true ? Mode.Shift : RbCopy.IsChecked == true ? Mode.Copy : Mode.Fixed,
+            Origin = (Origin)Math.Max(CmbOrigin.SelectedIndex, 0),
             SetCreated = CkC.IsChecked == true, SetModified = CkM.IsChecked == true, SetTaken = CkT.IsChecked == true,
             Created = Combine(DpC, TmC), Modified = Combine(DpM, TmM), Taken = Combine(DpT, TmT),
             Interval = double.TryParse(TxInterval.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var iv) ? Math.Max(0, iv) : 0,
@@ -300,7 +317,9 @@ public partial class MainWindow : Window
         _ => new GeoEdit(GeoKind.Keep),
     };
 
-    IReadOnlyList<Item> Targets() => Table.SelectedItems.Count > 0 ? Table.SelectedItems.Cast<Item>().ToList() : items;
+    /// <summary>Ohne Auswahl wirkt alles, was gerade angezeigt wird – nie unsichtbare, weggefilterte Zeilen.</summary>
+    IReadOnlyList<Item> Targets() =>
+        Table.SelectedItems.Count > 0 ? Table.SelectedItems.Cast<Item>().ToList() : IsFiltered ? view.Cast<Item>().ToList() : items;
 
     void Recompute()
     {
@@ -315,11 +334,14 @@ public partial class MainWindow : Window
         var n = work.Count;
         BtnApply.IsEnabled = n > 0 && !busy && settings.Valid;
         BtnApply.Content = !settings.Valid ? "Ungültiges Datum" : n == 0 ? "Keine Änderung" : $"{n} Objekte ändern";
-        InfoText.Text = Table.SelectedItems.Count == 0
-            ? $"Wirkt auf alle {items.Count} Objekte"
-            : $"Wirkt auf {Table.SelectedItems.Count} ausgewählte Objekte";
+        InfoText.Text = Table.SelectedItems.Count > 0 ? $"Wirkt auf {Table.SelectedItems.Count} ausgewählte Objekte"
+            : IsFiltered ? $"Wirkt auf die {targets.Count} angezeigten Objekte" : $"Wirkt auf alle {items.Count} Objekte";
+        CopyHint.Text = settings.Origin == Origin.Name
+            ? "Liest das Datum aus Namen wie IMG-20190713-WA0001, PXL_20210101_120533 oder Bildschirmfoto 2020-02-18 um 14.22.05 (ohne Uhrzeit: 12:00)."
+            : "Setzt die gewählten Werte auf das Datum der Quelle. Dateien ohne dieses Datum und Werte, die schon stimmen, bleiben unverändert.";
         if (!busy)
-            StatusText.Text = $"{items.Count} Objekte · {Table.SelectedItems.Count} ausgewählt · {items.Count(i => i.Lat != null)} mit Standort";
+            StatusText.Text = $"{items.Count} Objekte · {Table.SelectedItems.Count} ausgewählt · {items.Count(i => i.Lat != null)} mit Standort"
+                              + (IsFiltered ? $" · {targets.Count} angezeigt" : "");
     }
 
     // ---------- Standort ----------
@@ -392,18 +414,20 @@ public partial class MainWindow : Window
                 MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
         var pl = plans;
         var geo = Geo(settings);
-        undo = work.ToDictionary(i => i.FullPath, i => (i.Created, i.Modified), StringComparer.OrdinalIgnoreCase);
+        undo = work.ToDictionary(i => i.FullPath,
+            i => new UndoRec(i.Created, i.Modified, i.Taken, i.Lat, i.Lon, pl.GetValueOrDefault(i).Taken != null, geo.Kind != GeoKind.Keep && i.IsJpeg),
+            StringComparer.OrdinalIgnoreCase);
         BtnUndo.IsEnabled = MnuUndo.IsEnabled = true;
         _ = RunAsync(work.ToList(), "geändert", it => Writer.Apply(it, pl.GetValueOrDefault(it), geo));
     }
 
-    /// <summary>Setzt nur Datei-Daten zurück; EXIF-Änderungen werden nicht rückgängig gemacht.</summary>
+    /// <summary>Stellt Datei-Daten, geändertes Aufnahmedatum und geänderten Standort wieder her (ein vorher fehlendes Aufnahmedatum bleibt).</summary>
     void OnUndo(object s, RoutedEventArgs e)
     {
         var u = undo;
         BtnUndo.IsEnabled = MnuUndo.IsEnabled = false;
         _ = RunAsync(items.Where(i => u.ContainsKey(i.FullPath)).ToList(), "zurückgesetzt",
-            it => Writer.Apply(it, new Plan(u[it.FullPath].C, u[it.FullPath].M, null), new GeoEdit(GeoKind.Keep)));
+            it => { var (p, g) = u[it.FullPath].Restore(); Writer.Apply(it, p, g); });
     }
 
     async Task RunAsync(List<Item> jobs, string verb, Action<Item> job)
@@ -442,7 +466,7 @@ public partial class MainWindow : Window
     void OnOrganize(object? s, RoutedEventArgs? e)
     {
         if (items.Count == 0 || busy) return;
-        var w = new OrganizeWindow(Targets(), sources, Table.SelectedItems.Count > 0) { Owner = this };
+        var w = new OrganizeWindow(Targets(), sources, Table.SelectedItems.Count > 0, IsFiltered) { Owner = this };
         if (w.ShowDialog() == true) _ = OrganizeAsync(w.Result, w.Copy, w.RemoveEmpty, w.Root);
     }
 
@@ -474,6 +498,72 @@ public partial class MainWindow : Window
         SetBusy(null);
         MessageBox.Show(this, $"{ops.Count - errs.Count} Dateien zurückgelegt." + (errs.Count > 0 ? "\n\nFehler:\n" + string.Join("\n", errs.Take(10)) : ""), "Fertig");
         await RescanAsync();
+    }
+
+    void OnRename(object? s, RoutedEventArgs? e)
+    {
+        if (items.Count == 0 || busy) return;
+        var w = new RenameWindow(Targets(), Table.SelectedItems.Count > 0, IsFiltered) { Owner = this };
+        if (w.ShowDialog() == true) _ = RenameAsync(w.Result);
+    }
+
+    /// <summary>Direkt hinzugefügte Dateien behalten beim Umbenennen ihren Platz in der Quellenliste.</summary>
+    void MapSources(Dictionary<string, string> moved)
+    {
+        for (var i = 0; i < sources.Count; i++)
+            if (moved.TryGetValue(sources[i], out var n)) sources[i] = n;
+    }
+
+    async Task RenameAsync(List<RenameMove> plan)
+    {
+        SetBusy("Benenne um …", indeterminate: false);
+        var r = await Task.Run(() => Renamer.Run(plan, p => Dispatcher.BeginInvoke(() => Prog.Value = p * 100)));
+        lastRenames = r.Ops;
+        MnuUndoRename.IsEnabled = r.Ops.Count > 0;
+        MapSources(r.Ops.ToDictionary(o => o.Src, o => o.Dst, StringComparer.OrdinalIgnoreCase));
+        SetBusy(null);
+        var msg = $"{r.Ops.Count} Dateien umbenannt.";
+        if (r.Errors.Count > 0) msg += "\n\nFehler:\n" + string.Join("\n", r.Errors.Take(10));
+        MessageBox.Show(this, msg, "Fertig", MessageBoxButton.OK, r.Errors.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        await RescanAsync();
+    }
+
+    async void OnUndoRename(object s, RoutedEventArgs e)
+    {
+        var ops = lastRenames;
+        lastRenames = new();
+        MnuUndoRename.IsEnabled = false;
+        SetBusy("Stelle wieder her …", indeterminate: true);
+        var errs = await Task.Run(() => Renamer.Undo(ops));
+        MapSources(ops.ToDictionary(o => o.Dst, o => o.Src, StringComparer.OrdinalIgnoreCase));
+        SetBusy(null);
+        MessageBox.Show(this, $"{ops.Count - errs.Count} Dateien zurückbenannt." + (errs.Count > 0 ? "\n\nFehler:\n" + string.Join("\n", errs.Take(10)) : ""), "Fertig");
+        await RescanAsync();
+    }
+
+    void OnGeotag(object? s, RoutedEventArgs? e)
+    {
+        if (items.Count == 0 || busy) return;
+        var w = new GeotagWindow(Targets()) { Owner = this };
+        if (w.ShowDialog() != true) return;
+        var map = w.Result;
+        var jobs = items.Where(map.ContainsKey).ToList();
+        if (jobs.Count == 0) return;
+        undo = jobs.ToDictionary(i => i.FullPath, i => new UndoRec(i.Created, i.Modified, i.Taken, i.Lat, i.Lon, false, true), StringComparer.OrdinalIgnoreCase);
+        BtnUndo.IsEnabled = MnuUndo.IsEnabled = true;
+        _ = RunAsync(jobs, "mit Standort versehen", it => Writer.Apply(it, default, new GeoEdit(GeoKind.Set, map[it].Lat, map[it].Lon)));
+    }
+
+    void OnExport(object? s, RoutedEventArgs? e)
+    {
+        var d = new Microsoft.Win32.SaveFileDialog { Title = "Liste als CSV speichern", Filter = "CSV-Datei (*.csv)|*.csv", FileName = "Save the Date.csv" };
+        if (d.ShowDialog(this) != true) return;
+        try
+        {
+            File.WriteAllText(d.FileName, Csv.Make(view.Cast<Item>()), new UTF8Encoding(false));
+            StatusText.Text = "Liste gespeichert: " + d.FileName;
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Export fehlgeschlagen", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     void OnCleanup(object? s, RoutedEventArgs? e)

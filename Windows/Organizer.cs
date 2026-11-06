@@ -2,9 +2,9 @@ using System.IO;
 
 namespace SaveTheDate;
 
-public enum Pattern { YearMonth, YearMonthDay, Flat }       // JJJJ/MM, JJJJ/MM/TT, JJJJ-MM
+public enum Pattern { YearMonth, YearMonthDay, Flat, Year, DayFlat, YearDay }   // JJJJ/MM, JJJJ/MM/TT, JJJJ-MM, JJJJ, JJJJ-MM-TT, JJJJ/JJJJ-MM-TT
 
-public enum DateSource { Taken, Modified, Created }         // Aufnahme (sonst Änderung), Änderung, Erstellung
+public enum DateSource { Smart, Taken, Modified, Created }    // Aufnahme, Dateiname oder Änderung · Aufnahme (sonst Änderung) · Änderung · Erstellung
 
 public sealed class Move
 {
@@ -25,14 +25,18 @@ public static class Organizer
     {
         Pattern.YearMonthDay => Path.Combine($"{d.Year:0000}", $"{d.Month:00}", $"{d.Day:00}"),
         Pattern.Flat => $"{d.Year:0000}-{d.Month:00}",
+        Pattern.Year => $"{d.Year:0000}",
+        Pattern.DayFlat => $"{d.Year:0000}-{d.Month:00}-{d.Day:00}",
+        Pattern.YearDay => Path.Combine($"{d.Year:0000}", $"{d.Year:0000}-{d.Month:00}-{d.Day:00}"),
         _ => Path.Combine($"{d.Year:0000}", $"{d.Month:00}"),
     };
 
-    static DateTime Date(Item i, DateSource s) => s switch
+    public static DateTime? Date(Item i, DateSource s) => s switch
     {
         DateSource.Created => i.Created,
         DateSource.Modified => i.Modified,
-        _ => i.Taken ?? i.Modified,
+        DateSource.Taken => i.Taken ?? i.Modified,
+        _ => i.Taken ?? NameDate.Parse(i.Name) ?? i.Modified,
     };
 
     /// <summary>Zielpfad pro Datei bestimmen. Namenskonflikte: identischer Inhalt → überspringen, sonst " (2)", " (3)" …</summary>
@@ -42,7 +46,7 @@ public static class Organizer
         var list = new List<Move>();
         foreach (var it in items.Where(i => !i.IsDir && (!onlyMedia || i.IsMedia)).OrderBy(i => i.FullPath, StringComparer.OrdinalIgnoreCase))
         {
-            var dir = Path.Combine(root, Format(pattern, Date(it, source)));
+            var dir = Path.Combine(root, Format(pattern, Date(it, source)!.Value));
             var dst = Path.Combine(dir, it.Name);
             Move Make(string? skip = null) => new() { Item = it, Dst = dst, Rel = Path.GetRelativePath(root, dst), Skip = skip };
             if (string.Equals(Path.GetFullPath(dst), it.FullPath, StringComparison.OrdinalIgnoreCase))

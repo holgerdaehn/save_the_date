@@ -1,7 +1,7 @@
 import Foundation
 
 enum Pattern: String, CaseIterable, Identifiable {
-    case ym = "JJJJ/MM", ymd = "JJJJ/MM/TT", flat = "JJJJ-MM"
+    case ym = "JJJJ/MM", ymd = "JJJJ/MM/TT", flat = "JJJJ-MM", year = "JJJJ", dayFlat = "JJJJ-MM-TT", yearDay = "JJJJ/JJJJ-MM-TT"
     var id: Self { self }
 
     func path(_ d: Date) -> String {
@@ -11,16 +11,20 @@ enum Pattern: String, CaseIterable, Identifiable {
         case .ym: return String(format: "%04d/%02d", y, m)
         case .ymd: return String(format: "%04d/%02d/%02d", y, m, t)
         case .flat: return String(format: "%04d-%02d", y, m)
+        case .year: return String(format: "%04d", y)
+        case .dayFlat: return String(format: "%04d-%02d-%02d", y, m, t)
+        case .yearDay: return String(format: "%04d/%04d-%02d-%02d", y, y, m, t)
         }
     }
 }
 
 enum DateSource: String, CaseIterable, Identifiable {
-    case taken = "Aufnahme, sonst Änderung", modified = "Änderungsdatum", created = "Erstelldatum"
+    case smart = "Aufnahme, Dateiname oder Änderung", taken = "Aufnahme, sonst Änderung", modified = "Änderungsdatum", created = "Erstelldatum"
     var id: Self { self }
 
     func date(_ i: Item) -> Date? {
         switch self {
+        case .smart: i.taken ?? NameDate.parse(i.name) ?? i.modified ?? i.created
         case .taken: i.taken ?? i.modified ?? i.created
         case .modified: i.modified ?? i.created
         case .created: i.created ?? i.modified

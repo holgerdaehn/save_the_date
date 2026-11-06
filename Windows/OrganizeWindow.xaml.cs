@@ -15,11 +15,11 @@ public partial class OrganizeWindow : Window
     public bool RemoveEmpty => CkEmpty.IsChecked == true && !Copy;
     public string Root => TxRoot.Text;
 
-    public OrganizeWindow(IReadOnlyList<Item> targets, IEnumerable<string> sources, bool selection)
+    public OrganizeWindow(IReadOnlyList<Item> targets, IEnumerable<string> sources, bool selection, bool filtered = false)
     {
         InitializeComponent();
         this.targets = targets;
-        Intro.Text = $"Legt Fotos und Videos in Unterordner wie JJJJ/MM ab. Wirkt auf {(selection ? "die ausgewählten" : "alle")} Dateien der Liste.";
+        Intro.Text = $"Legt Fotos und Videos in Unterordner wie JJJJ/MM ab. Wirkt auf {(selection ? "die ausgewählten" : filtered ? "die angezeigten" : "alle")} Dateien der Liste.";
         TxRoot.Text = sources.FirstOrDefault(Directory.Exists) ?? "";
         ready = true;
         Refresh();

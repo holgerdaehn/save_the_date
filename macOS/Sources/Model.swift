@@ -9,6 +9,7 @@ struct Item: Identifiable, Sendable {
     let isDir: Bool
     let isImage: Bool
     var isMedia = false
+    var isMovie = false
     var size: Int64 = 0
     var created: Date?
     var modified: Date?
@@ -22,6 +23,12 @@ struct Item: Identifiable, Sendable {
     var modifiedKey: Date { modified ?? .distantPast }
     var takenKey: Date { taken ?? .distantPast }
     var gpsKey: Double { lat ?? -999 }
+    var sizeKey: Int64 { isDir ? -1 : size }
+    /// MP4/MOV: Aufnahmedatum im Container les- und schreibbar.
+    var isMP4: Bool { !isDir && Mp4.supports(id) }
+    /// Aufnahmedatum vorhanden bzw. änderbar (Foto-EXIF oder Video-Container).
+    var canTake: Bool { isImage || isMP4 }
+    var kind: String { isDir ? "Ordner" : isImage ? "Foto" : isMovie ? "Video" : "Datei" }
 }
 
 struct Plan: Sendable {
@@ -31,9 +38,60 @@ struct Plan: Sendable {
     var isEmpty: Bool { created == nil && modified == nil && taken == nil }
 }
 
+/// Zustand vor einer Änderung (Datei-Daten, Aufnahmedatum, Standort) für „Rückgängig“.
+struct UndoRec: Sendable {
+    var created: Date?
+    var modified: Date?
+    var taken: Date?
+    var lat: Double?
+    var lon: Double?
+    var touchedTaken: Bool
+    var touchedGeo: Bool
+
+    /// Was geschrieben werden muss, um den Zustand wiederherzustellen.
+    var restore: (plan: Plan, geo: GeoEdit) {
+        (Plan(created: created, modified: modified, taken: touchedTaken ? taken : nil),
+         touchedGeo ? (lat.map { .set($0, lon ?? 0) } ?? .remove) : .keep)
+    }
+}
+
 enum Mode: String, CaseIterable, Identifiable {
-    case fixed = "Festes Datum", shift = "Verschieben", exif = "Aus Aufnahme"
+    case fixed = "Festes Datum", shift = "Verschieben", copy = "Übernehmen"
     var id: Self { self }
+}
+
+/// Quelle für „Übernehmen“: woher das neue Datum kommt.
+enum Origin: String, CaseIterable, Identifiable {
+    case taken = "Aufnahmedatum", name = "Dateiname", created = "Erstelldatum", modified = "Änderungsdatum", oldest = "Ältestes Datum"
+    var id: Self { self }
+
+    func date(_ it: Item) -> Date? {
+        switch self {
+        case .taken: it.taken
+        case .created: it.created
+        case .modified: it.modified
+        case .oldest: [it.created, it.modified, it.taken].compactMap { $0 }.min()
+        case .name: NameDate.parse(it.name)
+        }
+    }
+}
+
+enum ItemFilter: String, CaseIterable, Identifiable {
+    case all = "Alle", photos = "Fotos", videos = "Videos", noTaken = "Ohne Aufnahmedatum", noGPS = "Ohne Standort",
+         hasGPS = "Mit Standort", differs = "Datum weicht ab"
+    var id: Self { self }
+
+    func matches(_ it: Item) -> Bool {
+        switch self {
+        case .all: true
+        case .photos: it.isImage
+        case .videos: it.isMovie
+        case .noTaken: it.canTake && it.taken == nil
+        case .noGPS: it.isImage && it.lat == nil
+        case .hasGPS: it.lat != nil
+        case .differs: it.taken.map { t in [it.created, it.modified].contains { $0.map { abs($0.timeIntervalSince(t)) > 2 } ?? false } } ?? false
+        }
+    }
 }
 
 enum GeoMode: String, CaseIterable, Identifiable {
@@ -43,6 +101,7 @@ enum GeoMode: String, CaseIterable, Identifiable {
 
 struct Settings {
     var mode = Mode.fixed
+    var origin = Origin.taken
     var setCreated = true, setModified = true, setTaken = false
     var created = Date.nowToSecond, modified = Date.nowToSecond, taken = Date.nowToSecond
     var linked = true
@@ -65,6 +124,27 @@ extension Date {
     var txt: String { formatted(.dateTime.day(.twoDigits).month(.twoDigits).year().hour().minute().second()) }
 }
 
+/// Liste als CSV (Trennzeichen „;“, UTF-8 mit BOM – öffnet sich in deutschem Excel direkt richtig).
+enum Csv {
+    static func make(_ items: [Item]) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        func q(_ s: String) -> String {
+            // Zellen, die wie Formeln aussehen, entschärfen (CSV-Injection).
+            let t = s.first.map { "=+-@\t\r".contains($0) } == true ? "'" + s : s
+            return t.contains(where: { ";\"\n\r".contains($0) }) ? "\"" + t.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : t
+        }
+        let head = ["Pfad", "Name", "Art", "Größe (Byte)", "Erstellt", "Geändert", "Aufnahme", "Breite", "Länge"].joined(separator: ";")
+        let rows = items.map { it in
+            [q(it.id.path), q(it.name), it.kind, it.isDir ? "" : String(it.size),
+             it.created.map { f.string(from: $0) } ?? "", it.modified.map { f.string(from: $0) } ?? "", it.taken.map { f.string(from: $0) } ?? "",
+             it.lat.map { String(format: "%.6f", $0).replacingOccurrences(of: ".", with: ",") } ?? "", it.lon.map { String(format: "%.6f", $0).replacingOccurrences(of: ".", with: ",") } ?? ""].joined(separator: ";")
+        }
+        return "\u{FEFF}" + ([head] + rows).joined(separator: "\r\n") + "\r\n"
+    }
+}
+
 enum Scan {
     static func list(_ sources: [URL], _ o: ScanOptions) -> [Item] {
         let keys: [URLResourceKey] = [.isDirectoryKey, .creationDateKey, .contentModificationDateKey, .contentTypeKey, .fileSizeKey]
@@ -75,7 +155,7 @@ enum Scan {
             if dir && !o.dirs { return nil }
             let image = !dir && v.contentType?.conforms(to: .image) == true
             let movie = !dir && v.contentType?.conforms(to: .movie) == true
-            return Item(id: u, isDir: dir, isImage: image, isMedia: image || movie, size: Int64(v.fileSize ?? 0),
+            return Item(id: u, isDir: dir, isImage: image, isMedia: image || movie, isMovie: movie, size: Int64(v.fileSize ?? 0),
                         created: v.creationDate, modified: v.contentModificationDate)
         }
         for s in sources.map(\.standardizedFileURL) {
@@ -106,6 +186,9 @@ enum Apply {
         if it.isImage, p.taken != nil || geo != .keep {
             try Exif.write(it.id, taken: p.taken, geo: geo)
             meta = true
+        } else if it.isMP4, let t = p.taken {
+            try Mp4.write(it.id, t)
+            meta = true
         }
         guard meta || p.modified != nil || p.created != nil else { return }
         let fm = FileManager.default
@@ -130,11 +213,16 @@ final class Store {
     var showDupes = false
     var showOrganize = false
     var showCleanup = false
+    var showRename = false
+    var showGeotag = false
+    var search = ""
+    var filter = ItemFilter.all
     var helpTopic: String?
     var lastOps: [Organizer.Op] = []
     var lastRoot: URL?
+    var lastRenames: [Organizer.Op] = []
     @ObservationIgnored private var scanTask: Task<Void, Never>?
-    @ObservationIgnored private var undoData: [URL: Plan] = [:]
+    @ObservationIgnored private var undoData: [URL: UndoRec] = [:]
 
     init() {
         UserDefaults.standard.register(defaults: ["recursive": true, "dirs": false, "hidden": false, "confirm": true])
@@ -145,7 +233,15 @@ final class Store {
         return ScanOptions(recursive: d.bool(forKey: "recursive"), dirs: d.bool(forKey: "dirs"), hidden: d.bool(forKey: "hidden"))
     }
 
-    var targets: [Item] { selection.isEmpty ? items : items.filter { selection.contains($0.id) } }
+    var isFiltered: Bool { !search.isEmpty || filter != .all }
+
+    /// Die in der Tabelle angezeigten Zeilen (Suche und Filter angewendet).
+    var visible: [Item] {
+        isFiltered ? items.filter { (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) && filter.matches($0) } : items
+    }
+
+    /// Ohne Auswahl wirkt alles, was gerade angezeigt wird – nie unsichtbare, weggefilterte Zeilen.
+    var targets: [Item] { selection.isEmpty ? visible : items.filter { selection.contains($0.id) } }
 
     var coordinate: CLLocationCoordinate2D? {
         guard let la = s.lat, let lo = s.lon else { return nil }
@@ -184,16 +280,17 @@ final class Store {
                 let d = TimeInterval(i) * s.interval
                 if s.setCreated { p.created = s.created + d }
                 if s.setModified { p.modified = s.modified + d }
-                if s.setTaken, it.isImage { p.taken = s.taken + d }
+                if s.setTaken, it.canTake { p.taken = s.taken + d }
             case .shift:
                 if s.setCreated { p.created = it.created.map { $0 + off } }
                 if s.setModified { p.modified = it.modified.map { $0 + off } }
-                if s.setTaken, it.isImage { p.taken = it.taken.map { $0 + off } }
-            case .exif:
-                if let t = it.taken {
-                    if s.setCreated { p.created = t }
-                    if s.setModified { p.modified = t }
-                }
+                if s.setTaken, it.canTake { p.taken = it.taken.map { $0 + off } }
+            case .copy:
+                guard let v = s.origin.date(it) else { break }
+                let differs = { (d: Date?) in d.map { abs($0.timeIntervalSince(v)) >= 1 } ?? true }
+                if s.setCreated, differs(it.created) { p.created = v }
+                if s.setModified, differs(it.modified) { p.modified = v }
+                if s.setTaken, it.canTake, differs(it.taken) { p.taken = v }
             }
             r[it.id] = p
         }
@@ -232,7 +329,7 @@ final class Store {
             guard !Task.isCancelled else { return }
             items = list.sorted(using: sortOrder)
             selection.formIntersection(Set(items.map(\.id)))
-            let imgs = items.filter(\.isImage).map(\.id)
+            let imgs = items.filter(\.canTake).map(\.id)
             let chunks = stride(from: 0, to: imgs.count, by: 128).map { Array(imgs[$0 ..< min($0 + 128, imgs.count)]) }
             var done = 0
             await withTaskGroup(of: [(URL, Meta)].self) { g in
@@ -268,19 +365,39 @@ final class Store {
         let pl = plans(), geo = geoEdit
         let w = work(pl)
         guard !w.isEmpty else { report = "Keine Änderungen ausgewählt."; return }
-        undoData = Dictionary(uniqueKeysWithValues: w.map { ($0.id, Plan(created: $0.created, modified: $0.modified))})
-        canUndo = true
+        remember(w) { it in (pl[it.id]?.taken != nil, geo != .keep && it.isImage) }
         run(w, "geändert") { try Apply.one($0, pl[$0.id] ?? Plan(), geo) }
     }
 
-    /// Setzt nur Datei-Daten zurück; EXIF-Änderungen werden nicht rückgängig gemacht.
+    /// Standort per GPX-Track (pro Datei eine eigene Koordinate).
+    func applyGeo(_ m: [URL: (lat: Double, lon: Double)]) {
+        let w = items.filter { m[$0.id] != nil }
+        guard !w.isEmpty else { return }
+        remember(w) { _ in (false, true) }
+        run(w, "mit Standort versehen") { try Apply.one($0, Plan(), .set(m[$0.id]!.lat, m[$0.id]!.lon)) }
+    }
+
+    private func remember(_ w: [Item], _ touched: (Item) -> (taken: Bool, geo: Bool)) {
+        undoData = Dictionary(uniqueKeysWithValues: w.map { it in
+            let t = touched(it)
+            return (it.id, UndoRec(created: it.created, modified: it.modified, taken: it.taken, lat: it.lat, lon: it.lon,
+                                   touchedTaken: t.taken, touchedGeo: t.geo))
+        })
+        canUndo = true
+    }
+
+    /// Stellt Datei-Daten, geändertes Aufnahmedatum und geänderten Standort wieder her.
+    /// Ein Aufnahmedatum, das vorher fehlte, lässt sich nicht wieder entfernen.
     func undo() {
         let d = undoData
         canUndo = false
-        run(items.filter { d[$0.id] != nil }, "zurückgesetzt") { try Apply.one($0, d[$0.id]!, .keep) }
+        run(items.filter { d[$0.id] != nil }, "zurückgesetzt") { it in
+            let r = d[it.id]!.restore
+            try Apply.one(it, r.plan, r.geo)
+        }
     }
 
-    private func run(_ w: [Item], _ verb: String, _ job: @escaping @Sendable (Item) throws -> Void) {
+    func run(_ w: [Item], _ verb: String, _ job: @escaping @Sendable (Item) throws -> Void) {
         Task {
             progress = 0
             var ok = 0, failed: [String] = [], done = 0
@@ -334,6 +451,44 @@ final class Store {
         let errs = Organizer.undo(ops, root: root)
         report = "\(ops.count - errs.count) Dateien zurückgelegt." + (errs.isEmpty ? "" : "\n\nFehler:\n" + errs.prefix(10).joined(separator: "\n"))
         rescan()
+    }
+
+    // MARK: Umbenennen
+
+    func rename(_ plan: [Renamer.Move]) {
+        progress = 0
+        Task {
+            let r = await Task.detached { Renamer.run(plan) { p in Task { @MainActor in self.progress = p } } }.value
+            lastRenames = r.ops
+            // Direkt hinzugefügte Dateien behalten ihren Platz in der Quellenliste.
+            let moved = Dictionary(r.ops.map { ($0.src.standardizedFileURL, $0.dst) }, uniquingKeysWith: { $1 })
+            sources = sources.map { moved[$0.standardizedFileURL] ?? $0 }
+            progress = nil
+            report = "\(r.ops.count) Dateien umbenannt." + (r.errors.isEmpty ? "" : "\n\nFehler:\n" + r.errors.prefix(10).joined(separator: "\n"))
+            rescan()
+        }
+    }
+
+    func undoRename() {
+        let ops = lastRenames
+        lastRenames = []
+        let errs = Renamer.undo(ops)
+        let back = Dictionary(ops.map { ($0.dst.standardizedFileURL, $0.src) }, uniquingKeysWith: { $1 })
+        sources = sources.map { back[$0.standardizedFileURL] ?? $0 }
+        report = "\(ops.count - errs.count) Dateien zurückbenannt." + (errs.isEmpty ? "" : "\n\nFehler:\n" + errs.prefix(10).joined(separator: "\n"))
+        rescan()
+    }
+
+    // MARK: Export
+
+    func exportCSV() {
+        let p = NSSavePanel()
+        p.allowedContentTypes = [.commaSeparatedText]
+        p.nameFieldStringValue = "Save the Date.csv"
+        p.message = "Liste als CSV speichern (UTF-8, Trennzeichen „;“ – öffnet sich direkt in Excel und Numbers)"
+        guard p.runModal() == .OK, let u = p.url else { return }
+        do { try Csv.make(visible).write(to: u, atomically: true, encoding: .utf8) }
+        catch { report = "Export fehlgeschlagen: \(error.localizedDescription)" }
     }
 
     // MARK: Dialoge

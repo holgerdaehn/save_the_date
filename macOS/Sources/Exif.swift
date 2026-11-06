@@ -27,6 +27,7 @@ enum Exif {
     }()
 
     static func read(_ url: URL) -> Meta {
+        if Mp4.supports(url) { return Meta(taken: Mp4.read(url)) }
         let opts = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let src = CGImageSourceCreateWithURL(url as CFURL, opts),
               let p = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] else { return Meta() }

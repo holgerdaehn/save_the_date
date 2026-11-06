@@ -1,11 +1,28 @@
 <Window x:Class="SaveTheDate.DuplicatesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:SaveTheDate"
         Title="Duplikate" Width="1000" Height="700" MinWidth="760" MinHeight="480" WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <local:ThumbConverter x:Key="Thumb"/>
+    </Window.Resources>
     <DockPanel>
         <StackPanel DockPanel.Dock="Top" Margin="18,14,18,10">
             <TextBlock Text="Duplikate" FontSize="22" FontWeight="SemiBold"/>
-            <TextBlock Style="{StaticResource Secondary}" Text="Gleicher Inhalt (SHA-256) – egal, wie die Dateien heißen. Gelöscht wird nur in den Papierkorb."/>
+            <TextBlock x:Name="Intro" Style="{StaticResource Secondary}"
+                       Text="Gleicher Inhalt (SHA-256) – egal, wie die Dateien heißen. Gelöscht wird nur in den Papierkorb."/>
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <ComboBox x:Name="CmbMode" Width="190" SelectedIndex="0" SelectionChanged="OnModeChanged">
+                    <ComboBoxItem Content="Identischer Inhalt"/>
+                    <ComboBoxItem Content="Ähnliche Bilder"/>
+                </ComboBox>
+                <ComboBox x:Name="CmbSens" Width="120" SelectedIndex="1" Margin="8,0,0,0" Visibility="Collapsed"
+                          ToolTip="Wie verschieden Bilder sein dürfen" SelectionChanged="OnSensChanged">
+                    <ComboBoxItem Content="Streng"/>
+                    <ComboBoxItem Content="Normal"/>
+                    <ComboBoxItem Content="Locker"/>
+                </ComboBox>
+            </StackPanel>
         </StackPanel>
         <Border DockPanel.Dock="Bottom" Padding="18,12" BorderThickness="0,1,0,0" BorderBrush="#22808080">
             <DockPanel>
@@ -17,6 +34,7 @@
                 <ComboBox x:Name="CmbKeep" Width="220" SelectedIndex="0" VerticalAlignment="Center" SelectionChanged="OnKeepChanged">
                     <ComboBoxItem Content="Ältestes behalten"/>
                     <ComboBoxItem Content="Neuestes behalten"/>
+                    <ComboBoxItem Content="Größte Datei behalten"/>
                     <ComboBoxItem Content="Kürzesten Pfad behalten"/>
                     <ComboBoxItem Content="Erstes behalten"/>
                 </ComboBox>
@@ -25,8 +43,9 @@
         </Border>
         <Grid>
             <DataGrid x:Name="Table" AutoGenerateColumns="False" CanUserAddRows="False" CanUserSortColumns="False"
-                      SelectionMode="Single" GridLinesVisibility="None" HeadersVisibility="Column" RowHeight="34"
-                      BorderThickness="0" Background="Transparent" RowBackground="Transparent" Visibility="Collapsed">
+                      SelectionMode="Single" GridLinesVisibility="None" HeadersVisibility="Column" RowHeight="54"
+                      BorderThickness="0" Background="Transparent" RowBackground="Transparent" Visibility="Collapsed"
+                      VirtualizingPanel.IsVirtualizingWhenGrouping="True">
                 <DataGrid.GroupStyle>
                     <GroupStyle>
                         <GroupStyle.HeaderTemplate>
@@ -45,8 +64,17 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Name" Binding="{Binding Item.Name}" IsReadOnly="True" Width="260" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTemplateColumn Header="" Width="64">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Image Source="{Binding Item.FullPath, Converter={StaticResource Thumb}, IsAsync=True}"
+                                       Width="44" Height="44" Stretch="UniformToFill" Margin="6,0"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Item.Name}" IsReadOnly="True" Width="240" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="Ordner" Binding="{Binding Item.Folder}" IsReadOnly="True" Width="*" ElementStyle="{StaticResource Cell}"/>
+                    <DataGridTextColumn Header="Größe" Binding="{Binding Item.SizeText}" IsReadOnly="True" Width="80" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="Geändert" Binding="{Binding Item.ModifiedText}" IsReadOnly="True" Width="150" ElementStyle="{StaticResource Cell}"/>
                     <DataGridTextColumn Header="" Binding="{Binding Verdict}" IsReadOnly="True" Width="80" ElementStyle="{StaticResource Cell}"/>
                 </DataGrid.Columns>
