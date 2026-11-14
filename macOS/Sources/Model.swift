@@ -104,7 +104,7 @@ struct Settings {
     var origin = Origin.taken
     var setCreated = true, setModified = true, setTaken = false
     var created = Date.nowToSecond, modified = Date.nowToSecond, taken = Date.nowToSecond
-    var linked = true
+    var linked = false
     var interval = 0.0
     var later = true
     var days = 0, hours = 0, minutes = 0, seconds = 0
