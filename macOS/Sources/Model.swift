@@ -194,6 +194,11 @@ enum Apply {
         let fm = FileManager.default
         if let m = p.modified ?? it.modified { try fm.setAttributes([.modificationDate: m], ofItemAtPath: it.id.path) }
         if let c = p.created ?? it.created { try fm.setAttributes([.creationDate: c], ofItemAtPath: it.id.path) }
+        // Cloud-Ordner (OneDrive, Google Drive, Dropbox …) setzen das Erstelldatum teils still zurück.
+        if let c = p.created, let now = try fm.attributesOfItem(atPath: it.id.path)[.creationDate] as? Date,
+           abs(now.timeIntervalSince(c)) > 1 {
+            throw EditError("Erstelldatum wurde vom Speicherort nicht übernommen (z. B. OneDrive, Google Drive, Dropbox)")
+        }
     }
 }
 

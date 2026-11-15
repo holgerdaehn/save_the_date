@@ -80,6 +80,8 @@ struct HelpTopic: Identifiable {
         Dateien ohne das Quelldatum und Werte, die schon stimmen, bleiben unverändert (die Tabelle zeigt es in den →-Spalten).
 
         Gut zu wissen: Das Aufnahmedatum kann bei Fotos (JPEG, HEIC, PNG, TIFF) und bei MP4-/MOV-Videos geändert werden. Die Bilddaten werden dabei nicht neu komprimiert, bei Videos wird nur der Zeitstempel im Container ersetzt (UTC). Sind „Erstellt“ und „Geändert“ ausgeschaltet, bleiben diese Werte auch beim Schreiben der Fotodaten erhalten.
+
+        Cloud-Ordner wie OneDrive, Google Drive oder Dropbox übernehmen oft kein eigenes Erstelldatum, die App meldet das als Fehler. Dort besser das **Aufnahmedatum** setzen: Es steckt in der Datei selbst und wird von Fotos-Apps und Cloud-Diensten zum Sortieren genutzt.
         """),
         HelpTopic(id: "geo", title: "Standort setzen", symbol: "mappin.and.ellipse", body: """
         Im Bereich „Standort“ stehen **Unverändert**, **Setzen** und **Entfernen** zur Wahl.
