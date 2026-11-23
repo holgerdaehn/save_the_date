@@ -14,6 +14,10 @@ guard let path = args.first else {
 }
 
 let fm = FileManager.default
+var isDir: ObjCBool = false
+guard fm.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {
+    print("Ordner nicht gefunden: \(path)\nNetzlaufwerke über /Volumes/… angeben, nicht als smb://-Adresse."); exit(1)
+}
 let re = try! NSRegularExpression(pattern: #"^(\d{8})_(\d{9})_iOS"#)
 let fmt = DateFormatter()
 fmt.locale = Locale(identifier: "en_US_POSIX")
