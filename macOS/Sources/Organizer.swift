@@ -133,7 +133,11 @@ enum Organizer {
         for d in dirs.sorted(by: { $0.path.count > $1.path.count }) {
             var cur = d.standardizedFileURL
             while roots.contains(where: { cur.path.hasPrefix($0.standardizedFileURL.path + "/") }) {
-                guard let rest = try? fm.contentsOfDirectory(atPath: cur.path), rest.allSatisfy(Cleanup.isJunk) else { break }
+                // Nur Junk-Dateien zählen als leer; Ordner wie __MACOSX oder @eaDir können Daten enthalten.
+                guard let rest = try? fm.contentsOfDirectory(atPath: cur.path), rest.allSatisfy({ n in
+                    var dir: ObjCBool = false
+                    return Cleanup.isJunk(n) && fm.fileExists(atPath: cur.appendingPathComponent(n).path, isDirectory: &dir) && !dir.boolValue
+                }) else { break }
                 do { try fm.removeItem(at: cur); removed += 1 } catch { break }
                 cur = cur.deletingLastPathComponent()
             }

@@ -16,7 +16,7 @@ enum NameDate {
             let (y, mo, d) = (n(1)!, n(2)!, n(3)!)
             var c = DateComponents(year: y, month: mo, day: d, hour: n(4) ?? 12, minute: n(5) ?? 0, second: n(6) ?? 0)
             c.calendar = cal
-            if y >= 1990, y <= cal.component(.year, from: Date()) + 1, let r = cal.date(from: c),
+            if y >= 1900, y <= cal.component(.year, from: Date()) + 1, let r = cal.date(from: c),
                cal.dateComponents([.year, .month, .day], from: r) == DateComponents(year: y, month: mo, day: d) { return r }
         }
         if let m = epoch.firstMatch(in: name, range: all) {

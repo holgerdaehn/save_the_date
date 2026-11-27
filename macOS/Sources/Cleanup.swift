@@ -50,7 +50,10 @@ enum Cleanup {
             for u in contents(dir) {
                 let v = try? u.resourceValues(forKeys: keys)
                 let isDir = v?.isDirectory == true && v?.isSymbolicLink != true
-                if let r = reason(u.lastPathComponent, extra: extra) {
+                let n = u.lastPathComponent
+                // "._x" neben "x" enthält dessen Tags/Metadaten (exFAT, SMB) – nur verwaiste Reste entfernen.
+                let companion = n.hasPrefix("._") && FileManager.default.fileExists(atPath: dir.appendingPathComponent(String(n.dropFirst(2))).path)
+                if !companion, let r = reason(n, extra: extra) {
                     out.append(Junk(url: u, isDir: isDir, size: Int64(v?.fileSize ?? 0), reason: r))
                 } else if isDir && v?.isPackage != true {
                     if !walk(u, root: false) { empty = false }

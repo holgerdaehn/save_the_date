@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0 – 2026-11-27
+
+**Neu**
+- Skript `Scripts/datum-aus-name.swift`: setzt Erstell- und Änderungsdatum von Bildern wie `19860701_120000000_iOS.jpg` auf den Zeitstempel im Namen (mit Probelauf `-n`).
+- macOS: Meldung, wenn der Speicherort (z. B. OneDrive) das Erstelldatum nicht übernimmt.
+
+**Behoben**
+- Datum im Dateinamen wird jetzt ab 1900 erkannt (bisher erst ab 1990).
+- „Leere Ordner entfernen“ löscht keine Ordner mehr, in denen nur Unterordner wie `__MACOSX` oder `@eaDir` liegen.
+- Aufräumen entfernt `._`-Dateien nur noch, wenn die zugehörige Datei fehlt (Finder-Tags auf USB-Sticks und NAS bleiben erhalten).
+- Windows: EXIF-Block wächst bei wiederholten Änderungen nicht mehr.
+- macOS: „Alle Werte verknüpfen“ ist standardmäßig aus.
+
 ## 1.1.0 – 2026-11-07
 
 **Neu**

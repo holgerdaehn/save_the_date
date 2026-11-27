@@ -124,12 +124,12 @@ private let all = ScanOptions(recursive: true, dirs: false, hidden: true)
 @Test func cleanupFindsJunkAndEmptyFolders() throws {
     let d = try tempDir()
     try write(d.appendingPathComponent("foto.jpg"), [1])
-    for n in ["desktop.ini", ".DS_Store", "._foto.jpg", "x.tmp"] { try write(d.appendingPathComponent(n), [0]) }
+    for n in ["desktop.ini", ".DS_Store", "._foto.jpg", "._weg.jpg", "x.tmp"] { try write(d.appendingPathComponent(n), [0]) }
     try write(d.appendingPathComponent("nurmuell/Thumbs.db"), [0])
     try FileManager.default.createDirectory(at: d.appendingPathComponent("leer/tief"), withIntermediateDirectories: true)
     let found = Cleanup.scan([d], extra: ["*.TMP"], removeEmpty: true).map { $0.url.lastPathComponent }
-    for n in ["desktop.ini", ".DS_Store", "._foto.jpg", "x.tmp", "Thumbs.db", "nurmuell", "leer", "tief"] { #expect(found.contains(n), "\(n) fehlt in \(found)") }
-    #expect(!found.contains("foto.jpg"))
+    for n in ["desktop.ini", ".DS_Store", "._weg.jpg", "x.tmp", "Thumbs.db", "nurmuell", "leer", "tief"] { #expect(found.contains(n), "\(n) fehlt in \(found)") }
+    #expect(!found.contains("foto.jpg") && !found.contains("._foto.jpg"))
     #expect(found.firstIndex(of: "tief")! < found.firstIndex(of: "leer")!)
     #expect(!Cleanup.scan([d], extra: [], removeEmpty: false).contains { $0.reason == "Leerer Ordner" })
 }
@@ -147,6 +147,7 @@ private func ymdhms(_ y: Int, _ mo: Int, _ d: Int, _ h: Int = 12, _ mi: Int = 0,
     #expect(NameDate.parse("Screenshot_20200218-142205.png") == ymdhms(2020, 2, 18, 14, 22, 5))
     #expect(NameDate.parse("2019-07-13 14.22.05.jpg") == ymdhms(2019, 7, 13, 14, 22, 5))
     #expect(NameDate.parse("signal-1612345678901.jpg") == Date(timeIntervalSince1970: 1_612_345_678.901))
+    #expect(NameDate.parse("19860701_120000000_iOS 1.jpg") == ymdhms(1986, 7, 1, 12, 0, 0))
     #expect(NameDate.parse("IMG_20190230_101010.jpg") == nil)         // 30. Februar
     #expect(NameDate.parse("IMG_4711.jpg") == nil && NameDate.parse("foto 120190713123.jpg") == nil)
 }
@@ -303,4 +304,12 @@ private extension URL { func also(_ f: (URL) throws -> Void) rethrows -> URL { t
     let csv = Csv.make([it])
     #expect(csv.hasPrefix("\u{FEFF}Pfad;Name;Art"))
     #expect(csv.contains("\"'=SUM(A1);\"\"q\"\".txt\"") && csv.contains(";Datei;5;"))
+}
+
+@Test func pruneKeepsJunkFolders() throws {
+    let d = try tempDir()
+    try write(d.appendingPathComponent("a/__MACOSX/x"), [1])
+    try write(d.appendingPathComponent("b/.DS_Store"), [0])
+    #expect(Organizer.pruneEmpty([d.appendingPathComponent("a"), d.appendingPathComponent("b")], roots: [d]) == 1)
+    #expect(FileManager.default.fileExists(atPath: d.appendingPathComponent("a/__MACOSX/x").path))
 }

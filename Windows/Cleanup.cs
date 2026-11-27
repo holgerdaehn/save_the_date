@@ -54,7 +54,9 @@ public static class Cleanup
             foreach (var e in new DirectoryInfo(dir).EnumerateFileSystemInfos("*", eo))
             {
                 var isDir = e is DirectoryInfo && (e.Attributes & FileAttributes.ReparsePoint) == 0;
-                if (Reason(e.Name, extra) is { } r) found.Add(new Junk(e.FullName, e is DirectoryInfo, e is FileInfo f ? f.Length : 0, r));
+                // "._x" neben "x" enthält dessen Mac-Metadaten (Tags) – nur verwaiste Reste entfernen.
+                var companion = e.Name.StartsWith("._") && Path.Exists(Path.Combine(dir, e.Name[2..]));
+                if (!companion && Reason(e.Name, extra) is { } r) found.Add(new Junk(e.FullName, e is DirectoryInfo, e is FileInfo f ? f.Length : 0, r));
                 else if (isDir) { if (!Walk(e.FullName, false)) empty = false; }
                 else empty = false;
             }

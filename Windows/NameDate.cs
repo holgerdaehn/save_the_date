@@ -24,7 +24,7 @@ public static partial class NameDate
             var y = N(1, 0);
             try
             {
-                if (y >= 1990 && y <= DateTime.Now.Year + 1) return new DateTime(y, N(2, 1), N(3, 1), N(4, 12), N(5, 0), N(6, 0));
+                if (y >= 1900 && y <= DateTime.Now.Year + 1) return new DateTime(y, N(2, 1), N(3, 1), N(4, 12), N(5, 0), N(6, 0));
             }
             catch (ArgumentOutOfRangeException) { }       // z. B. 30. Februar
         }

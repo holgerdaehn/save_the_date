@@ -129,29 +129,66 @@ public static class ExifJpeg
         // ---- Schreiben ----
         public void Edit(DateTime? taken, GeoEdit geo)
         {
-            var (ifd0, next) = Ifd(G32(b, 4));
+            var ifd0Off = G32(b, 4);
+            var (ifd0, next) = Ifd(ifd0Off);
+            var ex = Sub(ifd0, 0x8769);
+            TrimTail(ifd0Off, ifd0, ex, taken != null, geo.Kind != GeoKind.Keep);
             if (taken is { } t)
             {
                 var s = Ascii(t.ToString("yyyy:MM:dd HH:mm:ss", CultureInfo.InvariantCulture));
                 var news = new List<byte[]> { Entry(0x9003, 2, s), Entry(0x9004, 2, s) };
-                if (Sub(ifd0, 0x8769) is not { } ex || Find(ex, 0x9000) == null) news.Add(Entry(0x9000, 7, "0231"u8.ToArray()));
-                SetSub(ifd0, 0x8769, news, keep: true);
+                if (ex == null || Find(ex, 0x9000) == null) news.Add(Entry(0x9000, 7, "0231"u8.ToArray()));
+                SetSub(ifd0, 0x8769, ex ?? [], news);
                 Replace(ifd0, Entry(0x0132, 2, s));
             }
             if (geo.Kind == GeoKind.Remove) ifd0.RemoveAll(e => G16(e, 0) == 0x8825);
             else if (geo.Kind == GeoKind.Set)
-                SetSub(ifd0, 0x8825, [
+                SetSub(ifd0, 0x8825, [], [
                     Entry(0, 1, [2, 2, 0, 0]),
                     Entry(1, 2, Ascii(geo.Lat >= 0 ? "N" : "S")), Entry(2, 5, Dms(geo.Lat)),
                     Entry(3, 2, Ascii(geo.Lon >= 0 ? "E" : "W")), Entry(4, 5, Dms(geo.Lon)),
-                ], keep: false);
+                ]);
             // IFD0 wandert ans Ende (Platz für neue Einträge); die alten Bytes bleiben unberührt stehen.
             P32(b, 4, WriteIfd(ifd0, next));
         }
 
-        void SetSub(List<byte[]> ifd0, int tag, List<byte[]> news, bool keep)
+        /// <summary>
+        /// Schneidet Bereiche ab, die diese Änderung ersetzt (alte IFD-Tabellen und Werte), sofern sie am Ende liegen –
+        /// so wächst der Block bei wiederholten Änderungen nicht. Alles andere bleibt an seiner Stelle.
+        /// </summary>
+        void TrimTail(uint ifd0Off, List<byte[]> ifd0, List<byte[]>? ex, bool date, bool gps)
         {
-            var l = keep && Find(ifd0, tag) is { } old ? Ifd(G32(old, 8)).E : [];
+            var dead = new List<(int S, int E)> { Table(ifd0Off, ifd0.Count) };
+            if (date)
+            {
+                if (ex != null && Find(ifd0, 0x8769) is { } p) dead.Add(Table(G32(p, 8), ex.Count));
+                foreach (var e in new[] { Find(ifd0, 0x0132), ex == null ? null : Find(ex, 0x9003), ex == null ? null : Find(ex, 0x9004) })
+                    if (e != null && Span(e) is { } r) dead.Add(r);
+            }
+            if (gps && Find(ifd0, 0x8825) is { } gp && Sub(ifd0, 0x8825) is { } g)
+            {
+                dead.Add(Table(G32(gp, 8), g.Count));
+                foreach (var e in g) if (Span(e) is { } r) dead.Add(r);
+            }
+            for (var i = dead.FindIndex(AtTail); i >= 0; i = dead.FindIndex(AtTail))
+            {
+                b.RemoveRange(dead[i].S, b.Count - dead[i].S);
+                dead.RemoveAt(i);
+            }
+            // Ende des Bereichs = Pufferende (ggf. plus ein Füllbyte für die Ausrichtung).
+            bool AtTail((int S, int E) r) => r.S >= 8 && r.S < r.E && r.E <= b.Count && r.E + r.E % 2 >= b.Count;
+        }
+
+        static (int, int) Table(uint off, int n) => ((int)off, (int)off + 2 + 12 * n + 4);
+
+        (int, int)? Span(byte[] e)
+        {
+            var len = Len(e);
+            return len > 4 ? ((int)G32(e, 8), (int)(G32(e, 8) + len)) : null;
+        }
+
+        void SetSub(List<byte[]> ifd0, int tag, List<byte[]> l, List<byte[]> news)
+        {
             foreach (var n in news) Replace(l, n);
             Replace(ifd0, Pointer(tag, WriteIfd(l, 0)));
         }
@@ -186,10 +223,11 @@ public static class ExifJpeg
 
         void Replace(List<byte[]> l, byte[] e) { l.RemoveAll(x => G16(x, 0) == G16(e, 0)); l.Add(e); }
 
+        long Len(byte[] e) => G32(e, 4) * (G16(e, 2) switch { 3 or 8 => 2, 4 or 9 or 11 => 4, 5 or 10 or 12 => 8, _ => 1 });
+
         byte[] Val(byte[] e)
         {
-            int type = G16(e, 2);
-            long len = G32(e, 4) * (type switch { 3 or 8 => 2, 4 or 9 or 11 => 4, 5 or 10 or 12 => 8, _ => 1 });
+            var len = Len(e);
             return len <= 4 ? e[8..(8 + (int)len)] : b.GetRange((int)G32(e, 8), (int)len).ToArray();
         }
 

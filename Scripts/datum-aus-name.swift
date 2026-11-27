@@ -34,9 +34,13 @@ for case let u as URL in en {
     guard let v = try? u.resourceValues(forKeys: keys), v.isRegularFile == true,
           v.contentType?.conforms(to: .image) == true else { continue }
     let name = u.lastPathComponent
-    guard let m = re.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
-          let d = fmt.date(from: (name as NSString).substring(with: m.range(at: 1)) + (name as NSString).substring(with: m.range(at: 2)))
-    else { continue }
+    guard let m = re.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) else { continue }
+    // Ungültige Zeitstempel (z. B. 31. Juni oder 02:30 bei Beginn der Sommerzeit) melden statt still überspringen.
+    guard let d = fmt.date(from: (name as NSString).substring(with: m.range(at: 1)) + (name as NSString).substring(with: m.range(at: 2))) else {
+        failed += 1
+        print("FEHLER: ungültiger Zeitstempel im Namen: \(u.path)")
+        continue
+    }
 
     let same = { (x: Date?) in x.map { abs($0.timeIntervalSince(d)) < 1 } ?? false }
     if same(v.creationDate) && same(v.contentModificationDate) { ok += 1; continue }

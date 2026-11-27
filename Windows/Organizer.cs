@@ -141,10 +141,11 @@ public static class Organizer
             {
                 if (Directory.Exists(cur))
                 {
-                    if (!Directory.EnumerateFileSystemEntries(cur).All(e => Cleanup.IsJunk(Path.GetFileName(e)))) break;
+                    // Nur Junk-Dateien zählen als leer; Ordner wie __MACOSX oder @eaDir können Daten enthalten.
+                    if (Directory.EnumerateDirectories(cur).Any() || !Directory.EnumerateFiles(cur).All(e => Cleanup.IsJunk(Path.GetFileName(e)))) break;
                     try
                     {
-                        foreach (var f in Directory.EnumerateFiles(cur, "*", SearchOption.AllDirectories)) File.SetAttributes(f, FileAttributes.Normal);
+                        foreach (var f in Directory.EnumerateFiles(cur)) File.SetAttributes(f, FileAttributes.Normal);
                         Directory.Delete(cur, true);
                         removed++;
                     }

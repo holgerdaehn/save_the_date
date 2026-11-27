@@ -20,6 +20,13 @@ Assert(m.Taken == taken && m.Lat == null, "Entfernen");
 ExifJpeg.Update(f, taken.AddDays(1), new GeoEdit(GeoKind.Keep));
 Assert(ExifJpeg.Read(f).Taken == taken.AddDays(1), "Nur Datum");
 
+// Wiederholte Änderungen dürfen den EXIF-Block nicht wachsen lassen
+var size0 = new FileInfo(f).Length;
+for (var i = 0; i < 200; i++) ExifJpeg.Update(f, taken.AddDays(i % 2 + 1), new GeoEdit(GeoKind.Set, 50 + i % 2, 8));
+m = ExifJpeg.Read(f);
+Assert(m.Taken == taken.AddDays(2) && Math.Abs(m.Lat!.Value - 51) < 1e-4, "nach 200 Änderungen");
+Assert(new FileInfo(f).Length < size0 + 400, $"EXIF wächst: {size0} -> {new FileInfo(f).Length}");
+
 // Bilddaten unverändert: alles ab dem Start-of-Scan (Segmente korrekt übersprungen) muss identisch sein
 static byte[] Scan(byte[] d)
 {
@@ -76,13 +83,17 @@ Console.WriteLine("Sortieren ok");
 // ---- Aufräumen ----
 var d3 = Temp();
 W(d3, "foto.jpg", [1]);
-foreach (var n in new[] { "desktop.ini", ".DS_Store", "._foto.jpg", "x.tmp" }) W(d3, n, [0]);
+foreach (var n in new[] { "desktop.ini", ".DS_Store", "._foto.jpg", "._weg.jpg", "x.tmp" }) W(d3, n, [0]);
 W(d3, "nurmuell/Thumbs.db", [0]);
 Directory.CreateDirectory(Path.Combine(d3, "leer", "tief"));
 var found = Cleanup.Scan([d3], Cleanup.Patterns("*.TMP"), true, default).Select(j => Path.GetFileName(j.Path)).ToList();
-foreach (var n in new[] { "desktop.ini", ".DS_Store", "._foto.jpg", "x.tmp", "Thumbs.db", "nurmuell", "leer", "tief" }) Assert(found.Contains(n), n + " fehlt");
-Assert(!found.Contains("foto.jpg") && found.IndexOf("tief") < found.IndexOf("leer"), "Reihenfolge");
+foreach (var n in new[] { "desktop.ini", ".DS_Store", "._weg.jpg", "x.tmp", "Thumbs.db", "nurmuell", "leer", "tief" }) Assert(found.Contains(n), n + " fehlt");
+Assert(!found.Contains("foto.jpg") && !found.Contains("._foto.jpg") && found.IndexOf("tief") < found.IndexOf("leer"), "Reihenfolge");
 Assert(!Cleanup.Scan([d3], [], false, default).Any(j => j.Reason == "Leerer Ordner"), "ohne leere Ordner");
+var dPrune = Temp();
+W(dPrune, "a/__MACOSX/x", [1]);
+W(dPrune, "b/.DS_Store", [0]);
+Assert(Organizer.PruneEmpty([Path.Combine(dPrune, "a"), Path.Combine(dPrune, "b")], [dPrune]) == 1 && File.Exists(Path.Combine(dPrune, "a", "__MACOSX", "x")), "Junk-Ordner bleibt");
 Console.WriteLine("Aufräumen ok");
 
 // ---- Datum aus Dateiname ----
@@ -93,6 +104,7 @@ Assert(NameDate.Parse("Bildschirmfoto 2020-02-18 um 14.22.05.png") == D(2020, 2,
 Assert(NameDate.Parse("Screenshot_20200218-142205.png") == D(2020, 2, 18, 14, 22, 5), "Screenshot");
 Assert(NameDate.Parse("2019-07-13 14.22.05.jpg") == D(2019, 7, 13, 14, 22, 5), "mit Trennzeichen");
 Assert(NameDate.Parse("signal-1612345678901.jpg") == DateTimeOffset.FromUnixTimeMilliseconds(1612345678901).LocalDateTime, "Epoche (ms)");
+Assert(NameDate.Parse("19860701_120000000_iOS 1.jpg") == D(1986, 7, 1, 12, 0, 0), "vor 1990");
 Assert(NameDate.Parse("IMG_20190230_101010.jpg") == null, "30. Februar");
 Assert(NameDate.Parse("IMG_4711.jpg") == null && NameDate.Parse("foto 120190713123.jpg") == null, "kein Datum");
 Console.WriteLine("Dateiname-Datum ok");
